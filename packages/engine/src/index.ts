@@ -64,6 +64,30 @@ export class App {
     return this;
   }
 
+  public addStartupSystems(
+    ...systems: (SystemBuilderInput | SystemDescriptor[])[]
+  ): this {
+    return this.addSystems(ESystemType.StartUp, ...systems);
+  }
+
+  public addUpdateSystems(
+    ...systems: (SystemBuilderInput | SystemDescriptor[])[]
+  ): this {
+    return this.addSystems(ESystemType.Update, ...systems);
+  }
+
+  public addFixedUpdateSystems(
+    ...systems: (SystemBuilderInput | SystemDescriptor[])[]
+  ): this {
+    return this.addSystems(ESystemType.FixedUpdate, ...systems);
+  }
+
+  public addRenderSystems(
+    ...systems: (SystemBuilderInput | SystemDescriptor[])[]
+  ): this {
+    return this.addSystems(ESystemType.Render, ...systems);
+  }
+
   public get world(): ECSWorld {
     return this.#world;
   }

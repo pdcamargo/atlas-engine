@@ -106,4 +106,35 @@ export class Archetype {
       entityId: this.#entityIds[rowIndex],
     };
   }
+
+  public getEntityIndex(entityId: Entity): number | undefined {
+    return this.#entityIndexById.get(entityId);
+  }
+
+  public getComponentAt<T>(
+    rowIndex: number,
+    componentClass: ComponentClass<T>
+  ): T | undefined {
+    const column = this.#columns.get(componentClass);
+    if (!column) return undefined;
+    return column[rowIndex] as T;
+  }
+
+  public hasComponentClass(componentClass: ComponentClass<unknown>): boolean {
+    return this.#columns.has(componentClass);
+  }
+
+  public getEntityComponents(
+    entityId: Entity
+  ): Map<ComponentClass<unknown>, unknown> | null {
+    const rowIndex = this.#entityIndexById.get(entityId);
+    if (rowIndex === undefined) return null;
+
+    const components = new Map<ComponentClass<unknown>, unknown>();
+    for (const cls of this.#componentClasses) {
+      const column = this.#columns.get(cls)!;
+      components.set(cls, column[rowIndex]);
+    }
+    return components;
+  }
 }

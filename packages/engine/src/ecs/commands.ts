@@ -75,4 +75,39 @@ export class Commands {
     this.#app.setResource(value);
     return this;
   }
+
+  public getComponent<T>(entity: Entity, componentClass: ComponentClass<T>): T {
+    const component = this.#world.getComponent(entity, componentClass);
+    if (!component) {
+      throw new Error("Component not found");
+    }
+    return component;
+  }
+
+  public tryGetComponent<T>(
+    entity: Entity,
+    componentClass: ComponentClass<T>
+  ): T | undefined {
+    return this.#world.getComponent(entity, componentClass);
+  }
+
+  public hasComponent(
+    entity: Entity,
+    componentClass: ComponentClass<unknown>
+  ): boolean {
+    return this.#world.hasComponent(entity, componentClass);
+  }
+
+  public addComponent<T>(entity: Entity, component: T): void {
+    const componentClass = (component as any).constructor as ComponentClass<T>;
+    const record = { [componentClass.name]: component };
+    this.#world.addComponents(entity, record);
+  }
+
+  public removeComponent(
+    entity: Entity,
+    componentClass: ComponentClass<unknown>
+  ): boolean {
+    return this.#world.removeComponent(entity, componentClass);
+  }
 }

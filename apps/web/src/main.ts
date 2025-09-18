@@ -3,7 +3,6 @@ import "./style.css";
 import {
   App,
   Commands,
-  SystemType,
   EventsApi,
   PerspectiveCamera,
   BoxGeometry,
@@ -13,6 +12,13 @@ import {
   DefaultPlugin,
   sys,
   createSet,
+  MeshBasicMaterial,
+  Color,
+  AssetServer,
+  MouseMotionEvent,
+  Time,
+  Assets,
+  AudioSink,
 } from "@repo/engine";
 
 export class Comp1 {
@@ -40,6 +46,14 @@ class LevelUpEvent {
 }
 
 function spawnPlayer({ commands }: { commands: Commands }) {
+  const assetServer = commands.getResource(AssetServer);
+
+  const [, charcterMesh] = assetServer.loadGLTF(
+    "/character/scene.gltf#character"
+  );
+
+  commands.spawn(charcterMesh, new Transform(0, 0, 0));
+
   const viewPort = commands.getResource(ThreeViewport);
 
   const pc = new PerspectiveCamera(70, viewPort.aspect, 0.01, 10);
@@ -55,6 +69,26 @@ function spawnPlayer({ commands }: { commands: Commands }) {
   const mesh = new Mesh(geometry, material);
 
   commands.spawn(mesh, new Transform(0, 0, 0), new ThePlayer());
+
+  const random = (min: number, max: number) =>
+    Math.random() * (max - min) + min;
+
+  for (let i = 0; i < 100; i++) {
+    const mat = new MeshBasicMaterial({
+      color: new Color(random(0, 1), random(0, 1), random(0, 1)),
+    });
+
+    const ett = commands.spawn(
+      new Mesh(geometry, mat),
+      new Transform(random(-1, 1), random(-1, 1), random(-1, 1))
+    );
+
+    const msh = commands.getComponent(ett, Mesh);
+    const trn = commands.getComponent(ett, Transform);
+    msh.position.x = trn.x;
+    msh.position.y = trn.y;
+    msh.position.z = trn.z;
+  }
 }
 
 function playerSystem({
@@ -64,12 +98,19 @@ function playerSystem({
   commands: Commands;
   events: EventsApi;
 }) {
+  const reader = events.reader(MouseMotionEvent);
+  const time = commands.getResource(Time);
+
   const [mesh, transform] = commands.find(Mesh, Transform, ThePlayer);
   mesh.position.x = transform.x;
   mesh.position.y = transform.y;
   mesh.position.z = transform.z;
 
-  transform.x += 0.01;
+  const [res] = reader.read();
+
+  if (res) {
+    transform.x += 1 * time.deltaTime;
+  }
 
   if (transform.x > 1) {
     transform.x = 0;
@@ -87,17 +128,35 @@ function debugLevelups({ events }: { events: EventsApi }) {
     console.log("Entity leveled up!", ev.entityId);
   }
 }
+
+function spawnSound({ commands }: { commands: Commands }) {
+  const assetServer = commands.getResource(AssetServer);
+  const assets = commands.getResource(Assets);
+  // const audioServer = commands.getResource(AudioServer);
+  const [handle] = assetServer.loadSound("/level-up.mp3");
+
+  commands.spawn(new AudioSink(assets.get<Howl>(handle)));
+}
+
+function playSound({ commands }: { commands: Commands }) {
+  const [audioSink] = commands.find(AudioSink);
+
+  if (audioSink.isReady() && audioSink.getPlayCount() === 0) {
+    audioSink.play();
+  }
+}
+
 async function main() {
   await App.create()
     .addPlugins(new DefaultPlugin())
     .addEvent(LevelUpEvent)
-    .addSystems(SystemType.StartUp, spawnPlayer)
-    .addSystems(
-      SystemType.Update,
+    .addStartupSystems(spawnPlayer, spawnSound)
+    .addUpdateSystems(
       createSet(
         "Gameplay",
         sys(playerSystem).label("move-player"),
-        sys(debugLevelups).afterLabel("move-player")
+        sys(debugLevelups).afterLabel("move-player"),
+        sys(playSound).afterLabel("move-player")
       )
     )
     .run();

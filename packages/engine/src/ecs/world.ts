@@ -101,6 +101,63 @@ export class World {
     }
   }
 
+  public getComponent<T>(
+    entity: Entity,
+    componentClass: ComponentClass<T>
+  ): T | undefined {
+    const archetype = this.#archetypeByEntity.get(entity);
+    if (!archetype) return undefined;
+
+    const entityIndex = archetype.getEntityIndex(entity);
+    if (entityIndex === undefined) return undefined;
+
+    return archetype.getComponentAt(entityIndex, componentClass);
+  }
+
+  public hasComponent(
+    entity: Entity,
+    componentClass: ComponentClass<unknown>
+  ): boolean {
+    const archetype = this.#archetypeByEntity.get(entity);
+    if (!archetype) return false;
+
+    return archetype.hasComponentClass(componentClass);
+  }
+
+  public removeComponent(
+    entity: Entity,
+    componentClass: ComponentClass<unknown>
+  ): boolean {
+    const currentArchetype = this.#archetypeByEntity.get(entity);
+    if (!currentArchetype) return false;
+
+    if (!currentArchetype.hasComponentClass(componentClass)) return false;
+
+    // Get current components
+    const currentComponents = currentArchetype.getEntityComponents(entity);
+    if (!currentComponents) return false;
+
+    // Remove the specified component
+    currentComponents.delete(componentClass);
+
+    // If no components left, remove entity entirely
+    if (currentComponents.size === 0) {
+      currentArchetype.remove(entity);
+      this.#archetypeByEntity.delete(entity);
+      return true;
+    }
+
+    // Move to new archetype without the removed component
+    const newComponentClasses = [...currentComponents.keys()];
+    this.#moveEntityToArchetype(
+      entity,
+      newComponentClasses,
+      Object.fromEntries(currentComponents)
+    );
+
+    return true;
+  }
+
   public debug() {
     // console.log a formatted string of the world archetypes
     console.log(this.#archetypeByEntity);

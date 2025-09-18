@@ -3,6 +3,10 @@ export class Time {
   deltaTime = 0;
   fixedDelta = 1 / 60;
   elapsed = 0;
+
+  public get fps() {
+    return 1 / this.deltaTime;
+  }
 }
 
 import type { EcsPlugin } from "../../plugin";

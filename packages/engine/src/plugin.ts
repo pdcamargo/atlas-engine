@@ -1,5 +1,7 @@
 import type { App } from "./index";
 
+export type EcsPluginConstructor = new (...args: unknown[]) => EcsPlugin;
+
 export interface EcsPlugin {
   build(app: App): void | Promise<void>;
   ready?(app: App): boolean | Promise<boolean>;
@@ -7,7 +9,7 @@ export interface EcsPlugin {
   cleanup?(app: App): void | Promise<void>;
   name?(): string;
   isUnique?(): boolean; // default true
-  dependsOn?(): (string | (new (...args: unknown[]) => unknown))[]; // classes or names
+  dependsOn?(): (string | EcsPluginConstructor)[]; // classes or names
 }
 
 export interface EcsPluginGroup {

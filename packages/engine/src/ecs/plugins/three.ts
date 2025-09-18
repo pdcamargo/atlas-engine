@@ -107,6 +107,7 @@ const clearRenderer = sys(({ commands }) => {
 
 const addMeshesToScene = sys(({ commands }) => {
   const sm = commands.getResource(ThreeSceneManager);
+
   for (const [mesh] of commands.all(THREE.Mesh)) {
     if (!mesh.parent) {
       sm.getCurrentScene()!.add(mesh);
