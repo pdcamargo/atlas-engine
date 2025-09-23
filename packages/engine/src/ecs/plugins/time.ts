@@ -37,9 +37,5 @@ export class TimePlugin implements EcsPlugin {
         time.elapsed += time.deltaTime;
       })
     );
-
-    app.addSystems(SystemType.PreFixedUpdate, ({ commands }) => {
-      void commands; // fixedDelta already configured; no-op
-    });
   }
 }

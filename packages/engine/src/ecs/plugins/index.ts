@@ -4,3 +4,6 @@ export * from "./time";
 export * from "./assets";
 export * from "./input";
 export * from "./audio";
+export * from "./renderer2d";
+export * from "./viewport";
+export * from "./ui";

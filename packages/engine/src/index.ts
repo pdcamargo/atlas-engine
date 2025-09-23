@@ -8,6 +8,7 @@ export type { EventsApi } from "./ecs/events";
 
 export * from "./ecs/plugins";
 export * from "./ecs/types";
+export * from "./ecs/components";
 export { sys, createSet } from "./ecs/system_builder";
 export type { SystemBuilder } from "./ecs/system_builder";
 

@@ -1,6 +1,6 @@
 import type { App } from "./index";
 
-export type EcsPluginConstructor = new (...args: unknown[]) => EcsPlugin;
+export type EcsPluginConstructor = new (...args: any[]) => EcsPlugin;
 
 export interface EcsPlugin {
   build(app: App): void | Promise<void>;

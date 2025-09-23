@@ -5,7 +5,31 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { Howl } from "howler";
 
+import * as PIXI from "pixi.js";
+
 export type Handle = number | string | symbol;
+
+export class Texture2D {
+  #texture?: PIXI.Texture;
+
+  constructor(texturePromise: Promise<PIXI.Texture>) {
+    texturePromise.then((texture) => {
+      this.#texture = texture;
+    });
+  }
+
+  public isLoaded() {
+    return !!this.#texture;
+  }
+
+  public get() {
+    return this.#texture;
+  }
+
+  public get source() {
+    return this.#texture?.source;
+  }
+}
 
 export class Assets {
   #assets: Map<Handle, unknown> = new Map();
@@ -47,7 +71,7 @@ export class AssetServer {
 
     this.#assets.set(handle, sound);
 
-    return [handle, sound] as const;
+    return [sound, handle] as const;
   }
 
   public loadGLTF(url: string) {
@@ -71,7 +95,37 @@ export class AssetServer {
       }
     );
 
-    return [fileHandle, mesh] as const;
+    return [mesh, fileHandle] as const;
+  }
+
+  public loadTexture(url: string) {
+    const handle: Handle = url.split("#")?.[1] ?? Math.random().toString();
+    const finalUrl = url.split("#")?.[0] ?? url;
+
+    if (this.#assets.has(handle)) {
+      return [this.#assets.get(handle) as Texture2D, handle] as const;
+    }
+
+    const texture = new Texture2D(
+      new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const textureSource = PIXI.Texture.from({
+            resource: img,
+            // nearest
+            minFilter: "nearest",
+            magFilter: "nearest",
+          });
+          resolve(textureSource);
+        };
+        img.src = finalUrl;
+      })
+    );
+
+    this.#assets.set(handle, texture);
+
+    return [texture, handle] as const;
   }
 }
 

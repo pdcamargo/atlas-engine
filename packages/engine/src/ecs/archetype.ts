@@ -2,6 +2,7 @@ import type { ComponentClass, Entity } from "./types";
 
 export class Archetype {
   #componentClasses: ReadonlyArray<ComponentClass<unknown>>;
+  #componentClassSet: Set<ComponentClass<unknown>>;
   #entityIds: Entity[] = [];
   #entityIndexById: Map<Entity, number> = new Map();
   #columns: Map<ComponentClass<unknown>, unknown[]> = new Map();
@@ -10,6 +11,7 @@ export class Archetype {
     this.#componentClasses = [...componentClasses].sort((a, b) =>
       a.name < b.name ? -1 : a.name > b.name ? 1 : 0
     );
+    this.#componentClassSet = new Set(this.#componentClasses);
     for (const cls of this.#componentClasses) {
       this.#columns.set(cls, []);
     }
@@ -33,11 +35,17 @@ export class Archetype {
   }
 
   public hasAll(components: ReadonlyArray<ComponentClass<unknown>>): boolean {
-    const set = new Set(this.#componentClasses);
     for (const c of components) {
-      if (!set.has(c)) return false;
+      if (!this.#componentClassSet.has(c)) return false;
     }
     return true;
+  }
+
+  public hasAny(components: ReadonlyArray<ComponentClass<unknown>>): boolean {
+    for (const c of components) {
+      if (this.#componentClassSet.has(c)) return true;
+    }
+    return false;
   }
 
   public insert(
@@ -105,6 +113,19 @@ export class Archetype {
       },
       entityId: this.#entityIds[rowIndex],
     };
+  }
+
+  public fillRowInto<T extends readonly ComponentClass<unknown>[]>(
+    requested: T,
+    rowIndex: number,
+    out: unknown[]
+  ): Entity {
+    for (let i = 0; i < requested.length; i++) {
+      const cls = requested[i];
+      const column = this.#columns.get(cls)!;
+      out[i] = column[rowIndex];
+    }
+    return this.#entityIds[rowIndex];
   }
 
   public getEntityIndex(entityId: Entity): number | undefined {

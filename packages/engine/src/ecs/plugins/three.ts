@@ -96,8 +96,6 @@ export class ThreeSceneManager {
   }
 }
 
-export * from "three";
-
 export const ThreeSet = Symbol("ThreeSet");
 
 const clearRenderer = sys(({ commands }) => {
@@ -108,7 +106,7 @@ const clearRenderer = sys(({ commands }) => {
 const addMeshesToScene = sys(({ commands }) => {
   const sm = commands.getResource(ThreeSceneManager);
 
-  for (const [mesh] of commands.all(THREE.Mesh)) {
+  for (const [, mesh] of commands.query(THREE.Mesh).all()) {
     if (!mesh.parent) {
       sm.getCurrentScene()!.add(mesh);
     }
@@ -118,7 +116,7 @@ const addMeshesToScene = sys(({ commands }) => {
 const renderScene = sys(({ commands }) => {
   const r = commands.getResource(ThreeRenderer);
   const sm = commands.getResource(ThreeSceneManager);
-  const [camera] = commands.tryFind(THREE.PerspectiveCamera) ?? [];
+  const [, camera] = commands.query(THREE.PerspectiveCamera).tryFind() ?? [];
   if (camera) {
     r.renderer.render(sm.getCurrentScene()!, camera);
   }

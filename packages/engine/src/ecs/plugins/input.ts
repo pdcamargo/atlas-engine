@@ -2,6 +2,7 @@ import { App, EcsPlugin, Events } from "../..";
 import { Vector2 } from "../../math";
 import { createSet, sys } from "../system_builder";
 import { SystemFnArguments, SystemType } from "../types";
+import { Viewport, ViewportPlugin } from "./viewport";
 
 export const InputSet = Symbol("InputSet");
 
@@ -228,8 +229,18 @@ export class InputPlugin implements EcsPlugin {
     app.addEvent(MouseMotionEvent);
     app.addEvent(MouseWheelEvent);
 
-    app.setResource(new Input(document.body, app.events));
+    const viewport = app.getResource(Viewport);
+
+    app.setResource(new Input(viewport.container, app.events));
 
     app.addSystems(SystemType.PostRender, createSet(InputSet, updateInput));
+  }
+
+  public ready(app: App): boolean | Promise<boolean> {
+    return app.hasResource(Viewport) && app.hasResource(Input);
+  }
+
+  public dependsOn() {
+    return [ViewportPlugin];
   }
 }

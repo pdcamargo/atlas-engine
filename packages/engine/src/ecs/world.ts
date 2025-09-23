@@ -16,12 +16,26 @@ export class World {
     entity: Entity,
     components: T
   ): void {
-    const componentClasses = Object.keys(components).map(
-      (k) =>
-        (components as Record<string, unknown>)[k]!
-          .constructor as ComponentClass<unknown>
-    );
-    this.#moveEntityToArchetype(entity, componentClasses, components);
+    const currentArchetype = this.#archetypeByEntity.get(entity);
+    if (!currentArchetype) {
+      const componentClasses = Object.keys(components).map(
+        (k) =>
+          (components as Record<string, unknown>)[k]!
+            .constructor as ComponentClass<unknown>
+      );
+      this.#moveEntityToArchetype(entity, componentClasses, components);
+      return;
+    }
+
+    // Merge existing components with the new ones (new ones override same-class ones)
+    const existing = currentArchetype.getEntityComponents(entity) ?? new Map();
+    const mergedInstances = new Map<ComponentClass<unknown>, unknown>(existing);
+    for (const value of Object.values(components)) {
+      if (!value) continue;
+      const cls = (value as any).constructor as ComponentClass<unknown>;
+      mergedInstances.set(cls, value);
+    }
+    this.setComponentsFromInstances(entity, mergedInstances);
   }
 
   public setComponentsFromInstances(
@@ -97,6 +111,64 @@ export class World {
             [K in keyof T]: T[K] extends ComponentClass<infer U> ? U : never;
           },
         };
+      }
+    }
+  }
+
+  public *queryWhere<const T extends readonly ComponentClass<unknown>[]>(
+    withComponents: T,
+    withoutComponents: ReadonlyArray<ComponentClass<unknown>>
+  ): Generator<
+    {
+      entity: Entity;
+      components: {
+        [K in keyof T]: T[K] extends ComponentClass<infer U> ? U : never;
+      };
+    },
+    void,
+    void
+  > {
+    for (const arch of this.#archetypeByKey.values()) {
+      if (!arch.hasAll(withComponents)) continue;
+      if (withoutComponents.length > 0 && arch.hasAny(withoutComponents))
+        continue;
+      const rowCount = arch.getRowCount();
+      for (let i = 0; i < rowCount; i++) {
+        const { tuple, entityId } = arch.readRowAsTuple(withComponents, i);
+        yield {
+          entity: entityId,
+          components: tuple as unknown as {
+            [K in keyof T]: T[K] extends ComponentClass<infer U> ? U : never;
+          },
+        };
+      }
+    }
+  }
+
+  public eachWhere<const T extends readonly ComponentClass<unknown>[]>(
+    withComponents: T,
+    withoutComponents: ReadonlyArray<ComponentClass<unknown>>,
+    fn: (
+      entity: Entity,
+      components: {
+        [K in keyof T]: T[K] extends ComponentClass<infer U> ? U : never;
+      }
+    ) => void
+  ): void {
+    const temp: unknown[] = new Array(withComponents.length);
+    for (const arch of this.#archetypeByKey.values()) {
+      if (!arch.hasAll(withComponents)) continue;
+      if (withoutComponents.length > 0 && arch.hasAny(withoutComponents))
+        continue;
+      const rowCount = arch.getRowCount();
+      for (let i = 0; i < rowCount; i++) {
+        const entityId = arch.fillRowInto(withComponents, i, temp);
+        fn(
+          entityId,
+          temp as unknown as {
+            [K in keyof T]: T[K] extends ComponentClass<infer U> ? U : never;
+          }
+        );
       }
     }
   }

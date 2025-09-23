@@ -2,163 +2,258 @@ import "./style.css";
 
 import {
   App,
-  Commands,
-  EventsApi,
-  PerspectiveCamera,
-  BoxGeometry,
-  MeshNormalMaterial,
-  Mesh,
-  ThreeViewport,
   DefaultPlugin,
   sys,
-  createSet,
-  MeshBasicMaterial,
-  Color,
   AssetServer,
-  MouseMotionEvent,
+  SystemFnArguments,
+  TileMap,
+  Renderable,
+  FlexContainer,
+  Button,
+  UiContainer,
   Time,
-  Assets,
-  AudioSink,
+  Sprite,
+  Transform,
+  Point,
+  AnimatedSprite,
+  Camera2D,
+  Viewport,
 } from "@repo/engine";
 
-export class Comp1 {
-  constructor(public x = 0) {}
-}
-export class Comp2 {
-  constructor(public y = 0) {}
-}
-export class Comp3 {
-  constructor(public z = 0) {}
+class GameState {
+  hasBuiltWorld = false;
 }
 
-class Transform {
-  constructor(
-    public x = 0,
-    public y = 0,
-    public z = 0
-  ) {}
-}
+class WorldTileMap {}
 
-class ThePlayer {}
+class OreTileMap {}
 
-class LevelUpEvent {
-  constructor(public entityId: number) {}
-}
+const tilemapTexture = "/sprites/Ores/Ore Sprites.png";
+const grass = "/sprites/Grass.png";
+const conveyor = "/sprites/Other/Conveyor.png";
 
-function spawnPlayer({ commands }: { commands: Commands }) {
+export class ResumeGameEvent {}
+
+export class QuitGameEvent {}
+
+export class FpsDisplay {}
+
+function spawnPlayer({ commands, events }: SystemFnArguments) {
   const assetServer = commands.getResource(AssetServer);
 
-  const [, charcterMesh] = assetServer.loadGLTF(
-    "/character/scene.gltf#character"
+  const [texture] = assetServer.loadTexture(grass);
+  const [oreTexture] = assetServer.loadTexture(tilemapTexture);
+  const [conveyorTexture] = assetServer.loadTexture(conveyor);
+
+  const cam = new Camera2D(commands.getResource(Viewport));
+
+  cam.zoom = 2.1;
+
+  commands.spawn(cam);
+
+  commands.spawn(
+    new TileMap([texture], {
+      tileWidth: 16,
+      tileHeight: 16,
+    }),
+    new WorldTileMap()
   );
 
-  commands.spawn(charcterMesh, new Transform(0, 0, 0));
+  commands.spawn(
+    new TileMap([oreTexture], {
+      tileWidth: 16,
+      tileHeight: 16,
+    }),
+    new OreTileMap()
+  );
 
-  const viewPort = commands.getResource(ThreeViewport);
+  const cols = 16;
 
-  const pc = new PerspectiveCamera(70, viewPort.aspect, 0.01, 10);
+  // commands.spawn(
+  //   new Sprite(conveyorTexture, {
+  //     x: 0,
+  //     y: 0,
+  //     width: 16,
+  //     height: 16,
+  //   }),
+  //   Transform.fromPosition(new Point(50, 50))
+  // );
 
-  pc.position.z = 1;
-  pc.position.y = 0.25;
-
-  commands.spawn(pc);
-
-  const geometry = new BoxGeometry(0.2, 0.2, 0.2);
-  const material = new MeshNormalMaterial();
-
-  const mesh = new Mesh(geometry, material);
-
-  commands.spawn(mesh, new Transform(0, 0, 0), new ThePlayer());
-
-  const random = (min: number, max: number) =>
-    Math.random() * (max - min) + min;
-
-  for (let i = 0; i < 100; i++) {
-    const mat = new MeshBasicMaterial({
-      color: new Color(random(0, 1), random(0, 1), random(0, 1)),
-    });
-
-    const ett = commands.spawn(
-      new Mesh(geometry, mat),
-      new Transform(random(-1, 1), random(-1, 1), random(-1, 1))
+  for (let i = 0; i < cols; i++) {
+    commands.spawn(
+      new Sprite(conveyorTexture, {
+        x: i,
+        y: 0,
+        width: 16,
+        height: 16,
+      }),
+      Transform.fromPosition(new Point(50 + i * 16, 50))
     );
+  }
 
-    const msh = commands.getComponent(ett, Mesh);
-    const trn = commands.getComponent(ett, Transform);
-    msh.position.x = trn.x;
-    msh.position.y = trn.y;
-    msh.position.z = trn.z;
+  const frames = Array.from({ length: cols }, (_, i) => ({
+    x: i,
+    y: 0,
+    width: 16,
+    height: 16,
+    duration: 32,
+  }));
+
+  const t = Transform.fromPosition(new Point(50 + 16, 50 + 16));
+
+  t.rotation = 90;
+
+  commands.spawn(new AnimatedSprite(conveyorTexture, frames), t);
+  commands.spawn(
+    new AnimatedSprite(conveyorTexture, frames),
+    Transform.fromPosition(new Point(50 + 16, 50 + 32))
+  );
+  commands.spawn(
+    new AnimatedSprite(conveyorTexture, frames),
+    Transform.fromPosition(new Point(50 + 16, 50 + 48))
+  );
+  commands.spawn(
+    new AnimatedSprite(conveyorTexture, frames),
+    Transform.fromPosition(new Point(50 + 16, 50 + 64))
+  );
+
+  cam.transform.position.copyFrom(t.position);
+
+  cam.target = t;
+
+  const root = new FlexContainer();
+
+  root
+    .setPosition("absolute")
+    .setRight(0)
+    .setTop(0)
+    .setPadding(12)
+    .setGap(12)
+    .setDirection("column");
+
+  const fps = new UiContainer(root);
+  fps.setTextContent("FPS: 0").setColor("white");
+
+  const button = new Button(root);
+  const button2 = new Button(root);
+
+  const resumeEvent = events.writer(ResumeGameEvent);
+  const quitEvent = events.writer(QuitGameEvent);
+
+  button.element.onclick = () => {
+    resumeEvent.send(new ResumeGameEvent());
+  };
+
+  button2.element.onclick = () => {
+    quitEvent.send(new QuitGameEvent());
+  };
+
+  button.setTextContent("Resume");
+  button2.setTextContent("Quit");
+
+  commands.spawn(FpsDisplay, fps);
+}
+
+const buildWorld = sys(({ commands }) => {
+  const [, tilemap] = commands.tryFind(TileMap, WorldTileMap, Renderable) || [];
+  const [, oreTilemap] =
+    commands.tryFind(TileMap, OreTileMap, Renderable) || [];
+
+  if (!tilemap || !oreTilemap) {
+    return;
+  }
+
+  const gameState = commands.getResource(GameState);
+  gameState.hasBuiltWorld = true;
+
+  tilemap.clear();
+  oreTilemap.clear();
+
+  const tileSize = 16;
+
+  const chunkWidth = 32;
+  const chunkHeight = 32;
+
+  const offsetX = 50;
+  const offsetY = 50;
+
+  // [x, y]
+  const floors = [
+    [0, 5],
+    [1, 5],
+    [2, 5],
+    [0, 6],
+    [1, 6],
+    [2, 6],
+    [3, 6],
+    [4, 6],
+    [5, 6],
+    [1, 1],
+    [1, 1],
+    [1, 1],
+    [1, 1],
+  ];
+
+  for (let x = 0; x < chunkWidth; x++) {
+    for (let y = 0; y < chunkHeight; y++) {
+      const floor = floors[Math.floor(Math.random() * floors.length)];
+
+      tilemap.addTile(0, floor[0], floor[1], {
+        x: x * tileSize + offsetX,
+        y: y * tileSize + offsetY,
+      });
+    }
+  }
+
+  oreTilemap.addTile(0, 1, 0, {
+    x: offsetX,
+    y: offsetY,
+    tileHeight: 32,
+    // tileWidth: 16,
+  });
+
+  tilemap.cache();
+})
+  .runIf(({ commands }) => !commands.getResource(GameState).hasBuiltWorld)
+  .build();
+
+function resumeGame({ events }: SystemFnArguments) {
+  const resumeEvent = events.reader(ResumeGameEvent);
+  const quitEvent = events.reader(QuitGameEvent);
+
+  if (resumeEvent.read().length > 0) {
+    console.log("Resume game");
+  }
+
+  if (quitEvent.read().length > 0) {
+    console.log("Quit game");
   }
 }
 
-function playerSystem({
-  commands,
-  events,
-}: {
-  commands: Commands;
-  events: EventsApi;
-}) {
-  const reader = events.reader(MouseMotionEvent);
-  const time = commands.getResource(Time);
+function updateFps({ commands }: SystemFnArguments) {
+  const fps = commands.getResource(Time).fps;
 
-  const [mesh, transform] = commands.find(Mesh, Transform, ThePlayer);
-  mesh.position.x = transform.x;
-  mesh.position.y = transform.y;
-  mesh.position.z = transform.z;
+  const [[, fpsText]] = commands.all(UiContainer);
 
-  const [res] = reader.read();
-
-  if (res) {
-    transform.x += 1 * time.deltaTime;
-  }
-
-  if (transform.x > 1) {
-    transform.x = 0;
-  }
-
-  if (transform.x === 0.9900000000000007) {
-    const w = events.writer(LevelUpEvent);
-    w.send(new LevelUpEvent(123));
-  }
-}
-
-function debugLevelups({ events }: { events: EventsApi }) {
-  const r = events.reader(LevelUpEvent);
-  for (const ev of r.read()) {
-    console.log("Entity leveled up!", ev.entityId);
-  }
-}
-
-function spawnSound({ commands }: { commands: Commands }) {
-  const assetServer = commands.getResource(AssetServer);
-  const assets = commands.getResource(Assets);
-  // const audioServer = commands.getResource(AudioServer);
-  const [handle] = assetServer.loadSound("/level-up.mp3");
-
-  commands.spawn(new AudioSink(assets.get<Howl>(handle)));
-}
-
-function playSound({ commands }: { commands: Commands }) {
-  const [audioSink] = commands.find(AudioSink);
-
-  if (audioSink.isReady() && audioSink.getPlayCount() === 0) {
-    audioSink.play();
+  if (fpsText && fpsText.textContent !== `FPS: ${fps.toFixed(2)}`) {
+    fpsText.setTextContent(`FPS: ${fps.toFixed(2)}`);
   }
 }
 
 async function main() {
   await App.create()
-    .addPlugins(new DefaultPlugin())
-    .addEvent(LevelUpEvent)
-    .addStartupSystems(spawnPlayer, spawnSound)
-    .addUpdateSystems(
-      createSet(
-        "Gameplay",
-        sys(playerSystem).label("move-player"),
-        sys(debugLevelups).afterLabel("move-player"),
-        sys(playSound).afterLabel("move-player")
-      )
+    .addEvent(ResumeGameEvent)
+    .addEvent(QuitGameEvent)
+    .setResource(new GameState())
+    .addPlugins(
+      new DefaultPlugin({
+        canvas: document.querySelector<HTMLCanvasElement>("canvas"),
+      })
     )
+    .addStartupSystems(spawnPlayer)
+    .addUpdateSystems(buildWorld)
+    .addUpdateSystems(resumeGame)
+    .addUpdateSystems(updateFps)
     .run();
 
   console.log("App finished");
