@@ -30,7 +30,7 @@ export type Animation = {
 
 export type AnimatedSpriteOptions = {
   anchor?: { x: number; y: number };
-  animations: Animation[];
+  animations: Array<Animation> | ReadonlyArray<Animation>;
   defaultAnimationId?: AnimationId;
   texture: Texture2D;
   useFrameEndEvents?: boolean;

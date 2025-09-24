@@ -1,8 +1,8 @@
-enum TilesType {
-  Air = 0,
-  Grass = 1,
-  Rock = 2,
-  Sand = 3,
+export enum TilesType {
+  Air = "air",
+  Grass = "grass",
+  Rock = "rock",
+  Sand = "sand",
 }
 
 type PlaceObjectOptions = {

@@ -4,6 +4,11 @@ import { UserInteractionState } from "./resources/user-interaction";
 import { updateGridIndicator } from "./systems/update-grid-indicator";
 import { handleHoveredTile } from "./systems/handle-hovered-tile";
 import { initGame } from "./systems/init-game";
+import { BuildRequests } from "./resources/build-requests";
+import { initTileMap } from "./systems/init-tilemap";
+import { applyBuildRequests } from "./systems/apply-build-requests";
+import { GameState } from "./resources/game-state";
+import { addTilesSystem, buildWorld } from "./systems/build-world";
 
 class ChunkSettings {
   readonly size = 16;
@@ -16,18 +21,31 @@ class AppState {
 export class FactoryGamePlugin implements EcsPlugin {
   build(app: App) {
     app
+      .setResource(new GameState())
       .setResource(new UserInteractionState())
       .setResource(new ChunkSettings())
       .setResource(new AppState())
+      .setResource(new BuildRequests())
       .setResource(new WorldGrid())
       .addPlugins(
         new DefaultPlugin({
           canvas: document.querySelector<HTMLCanvasElement>("canvas"),
         })
       )
-      .addStartupSystems(createSet("Game", initGame))
+      .addStartupSystems(createSet("GameSetup", initGame, initTileMap))
       .addUpdateSystems(
-        createSet("Game", updateGridIndicator, handleHoveredTile)
+        createSet(
+          "Game",
+          updateGridIndicator,
+          handleHoveredTile,
+          applyBuildRequests,
+          addTilesSystem
+        ),
+        createSet("GameSetup", buildWorld)
+      )
+      .addSetRunIf(
+        "Game",
+        ({ commands }) => !!commands.getResource(GameState).hasBuiltWorld
       );
   }
 }

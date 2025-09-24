@@ -1,5 +1,4 @@
 import {
-  AnimatedSprite,
   AssetServer,
   Camera2D,
   Sprite,
@@ -8,14 +7,6 @@ import {
   Viewport,
 } from "@repo/engine";
 import { GridIndicator } from "../components/grid-indicator";
-
-const conveyorFrames = Array.from({ length: 16 }, (_, i) => ({
-  x: i,
-  y: 0,
-  width: 16,
-  height: 16,
-  duration: 32,
-}));
 
 const assetsUrl = "/sprites/Assets.png";
 
@@ -37,18 +28,18 @@ export const initGame = sys(({ commands }) => {
     new GridIndicator()
   );
 
-  commands.spawn(
-    new AnimatedSprite({
-      texture: assetServer.loadTexture("/sprites/Other/Conveyor.png")[0],
-      animations: [
-        {
-          id: "default",
-          frames: conveyorFrames,
-        },
-      ],
-    }),
-    Transform.fromPosition({ x: 0, y: 0 })
-  );
+  // commands.spawn(
+  //   new AnimatedSprite({
+  //     texture: assetServer.loadTexture("/sprites/Other/Conveyor.png")[0],
+  //     animations: [
+  //       {
+  //         id: "default",
+  //         frames: conveyorFrames,
+  //       },
+  //     ],
+  //   }),
+  //   Transform.fromPosition({ x: 0, y: 0 })
+  // );
 
   const cam = new Camera2D(commands.getResource(Viewport));
   cam.zoom = 2.1;

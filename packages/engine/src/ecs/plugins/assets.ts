@@ -99,7 +99,7 @@ export class AssetServer {
   }
 
   public loadTexture(url: string) {
-    const handle: Handle = url.split("#")?.[1] ?? Math.random().toString();
+    const handle: Handle = url.split("#")?.[1] ?? url;
     const finalUrl = url.split("#")?.[0] ?? url;
 
     if (this.#assets.has(handle)) {

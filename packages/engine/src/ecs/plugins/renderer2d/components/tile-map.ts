@@ -55,10 +55,9 @@ export class TileMap {
     options: { x: number; y: number; tileWidth?: number; tileHeight?: number }
   ) {
     if (!this.#textures.length) throw new Error("No textures provided");
-    if (textureIndex !== 0)
-      throw new Error("Single-atlas TileMap (tileId must be 0)");
-
-    const texture = this.#textures[textureIndex].get();
+    const base = this.#textures?.[textureIndex];
+    if (!base) throw new Error("Texture index out of range");
+    const texture = base.get();
     if (!texture) throw new Error("Texture not loaded");
 
     const slice = subTexture(

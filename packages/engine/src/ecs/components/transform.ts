@@ -58,7 +58,7 @@ export class Transform {
 
   public static fromPosition(position: PointLike | { x: number; y: number }) {
     const transform = new Transform();
-    transform.position.set(position.x, position.y);
+    transform.setPosition(position);
     return transform;
   }
 
