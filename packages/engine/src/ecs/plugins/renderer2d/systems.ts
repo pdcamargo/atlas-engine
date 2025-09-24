@@ -1,4 +1,4 @@
-import { sys, Transform } from "../../..";
+import { sys, Time, Transform } from "../../..";
 import { QueryBuilder } from "../../commands";
 
 import {
@@ -99,18 +99,17 @@ export const updateTransforms = sys(({ commands }) => {
 }).label("update-sprites-transform");
 
 export const updateAnimatedSprites = sys(({ commands, events }) => {
-  const now = performance.now();
+  const time = commands.getResource(Time);
+  const dtMs = time.deltaTime * 1000;
   const animationFrameWriter = events.writer(AnimationFrameChangedEvent);
   const animationFinishedWriter = events.writer(AnimationFinishedEvent);
 
   commands
     .query(animatedSpritesToUpdateTransformQuery)
     .forEach((_, _transform, animatedSprite) => {
-      // Calculate elapsed time since last update and accumulate it
-      const elapsed = now - animatedSprite.frameTimer;
-      animatedSprite.frameTimer = now;
+      // Accumulate using engine time delta (milliseconds)
       animatedSprite.frameAccumulator =
-        (animatedSprite.frameAccumulator ?? 0) + elapsed;
+        (animatedSprite.frameAccumulator ?? 0) + dtMs;
 
       // Initialize flags
       let hasChangedFrame = false;
@@ -118,17 +117,29 @@ export const updateAnimatedSprites = sys(({ commands, events }) => {
 
       // Advance frames while enough time has accumulated
       while (
+        animatedSprite.isPlaying &&
         animatedSprite.frameAccumulator >= animatedSprite.currentFrame.duration
       ) {
         const previousFrameIndex = animatedSprite.frameIndex;
+        const numFrames = animatedSprite.frames!.length;
         animatedSprite.frameAccumulator -= animatedSprite.currentFrame.duration;
-        animatedSprite.frameIndex =
-          (animatedSprite.frameIndex + 1) % animatedSprite.frames!.length;
 
-        hasChangedFrame = true;
-        // If we looped back to the first frame, animation finished a cycle
-        if (animatedSprite.frameIndex === 0 && previousFrameIndex !== 0) {
-          hasAnimationFinished = true;
+        const isLastFrame = previousFrameIndex >= numFrames - 1;
+        if (isLastFrame) {
+          if (animatedSprite.loop) {
+            animatedSprite.frameIndex = 0;
+            hasChangedFrame = true;
+            hasAnimationFinished = true;
+          } else {
+            // Stop at last frame; do not advance, do not change frame
+            hasAnimationFinished = true;
+            animatedSprite.isPlaying = false;
+            animatedSprite.frameAccumulator = 0;
+            break;
+          }
+        } else {
+          animatedSprite.frameIndex = previousFrameIndex + 1;
+          hasChangedFrame = true;
         }
       }
 
@@ -136,19 +147,33 @@ export const updateAnimatedSprites = sys(({ commands, events }) => {
         animatedSprite.setTextureForFrame(animatedSprite.frameIndex);
       }
 
-      if (hasChangedFrame) {
+      if (hasChangedFrame && animatedSprite.useFrameEndEvents) {
+        const currentAnimation = animatedSprite.currentAnimation;
+        const currentFrame = animatedSprite.currentFrame;
+        const FrameEventCtor =
+          currentFrame.frameEndEventClass ??
+          currentAnimation.frameEndEventClass ??
+          animatedSprite.frameEndEventClass ??
+          AnimationFrameChangedEvent;
+
         animationFrameWriter.send(
-          new AnimationFrameChangedEvent(
+          new FrameEventCtor(
             animatedSprite,
             animatedSprite.frameIndex,
-            animatedSprite.currentFrame
+            currentFrame
           )
         );
       }
 
-      if (hasAnimationFinished) {
+      if (hasAnimationFinished && animatedSprite.useAnimationEndEvents) {
+        const currentAnimation = animatedSprite.currentAnimation;
+        const AnimationEventCtor =
+          currentAnimation.animationEndEventClass ??
+          animatedSprite.animationEndEventClass ??
+          AnimationFinishedEvent;
+
         animationFinishedWriter.send(
-          new AnimationFinishedEvent(animatedSprite)
+          new AnimationEventCtor(animatedSprite, currentAnimation)
         );
       }
     });

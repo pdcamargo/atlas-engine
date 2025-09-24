@@ -43,12 +43,16 @@ export class Renderer2D {
 export class SceneGraph {
   #stage: PIXI.Container;
   #root: PIXI.Container;
+  #layers: PIXI.IRenderLayer[];
 
   constructor(root?: PIXI.Container | null) {
     this.#stage = new PIXI.Container();
     this.#root = root ?? new PIXI.Container();
 
     this.#stage.addChild(this.#root);
+
+    this.#layers = [new PIXI.RenderLayer(), new PIXI.RenderLayer()];
+    this.#root.addChild(...this.#layers);
   }
 
   public get root() {
@@ -59,7 +63,11 @@ export class SceneGraph {
     return this.#stage;
   }
 
-  public addChild(child: PIXI.Container) {
+  public addChild(child: PIXI.Container, layer = 0) {
     this.#root.addChild(child);
+
+    if (layer >= 0 && layer < this.#layers.length) {
+      this.#layers[layer].attach(child);
+    }
   }
 }

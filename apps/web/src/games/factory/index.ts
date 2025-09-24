@@ -1,0 +1,1 @@
+export { FactoryGamePlugin } from "./factory";

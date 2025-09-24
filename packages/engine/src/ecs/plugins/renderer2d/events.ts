@@ -8,6 +8,7 @@ export class AnimationFrameChangedEvent {
 
 export class AnimationFinishedEvent {
   constructor(
-    public readonly animatedSprite: import("./components").AnimatedSprite
+    public readonly animatedSprite: import("./components").AnimatedSprite,
+    public readonly animation: import("./components").AnimatedSprite["currentAnimation"]
   ) {}
 }

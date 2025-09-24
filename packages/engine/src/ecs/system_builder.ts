@@ -22,6 +22,10 @@ export class SystemBuilder {
     };
   }
 
+  public getLabels(): Array<string> {
+    return Array.from(this.#desc.labels);
+  }
+
   public label(name: string): this {
     this.#desc.labels.add(name);
     return this;

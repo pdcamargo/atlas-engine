@@ -190,7 +190,12 @@ export class Input {
     if (this.#hasMouseMotion) {
       this.#events
         .writer(MouseMotionEvent)
-        .send(new MouseMotionEvent(this.#accumulatedMouseMotion.clone()));
+        .send(
+          new MouseMotionEvent(
+            this.#accumulatedMouseMotion.clone(),
+            this.#mousePosition.clone()
+          )
+        );
       this.#accumulatedMouseMotion.set(0, 0);
       this.#hasMouseMotion = false;
     }
@@ -211,11 +216,11 @@ const updateInput = sys(({ commands }: SystemFnArguments) => {
   input.update();
 }).label("updateInput");
 
-/**
- * Capture mouse motion event, without caring about the actual position
- */
 export class MouseMotionEvent {
-  constructor(public delta: Vector2) {}
+  constructor(
+    public delta: Vector2,
+    public currentPosition: Vector2
+  ) {}
 }
 
 export class MouseWheelEvent {

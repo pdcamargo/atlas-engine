@@ -33,6 +33,11 @@ export class Transform {
     this.#isDirty = true;
   }
 
+  public setPosition(position: PointLike | { x: number; y: number }) {
+    this.#position.copyFrom(position);
+    this.#isDirty = true;
+  }
+
   public set rotation(rotation: number) {
     this.#rotation = rotation;
     this.#isDirty = true;
@@ -51,9 +56,9 @@ export class Transform {
     this.#isDirty = isDirty;
   }
 
-  public static fromPosition(position: PointLike) {
+  public static fromPosition(position: PointLike | { x: number; y: number }) {
     const transform = new Transform();
-    transform.position = position;
+    transform.position.set(position.x, position.y);
     return transform;
   }
 
