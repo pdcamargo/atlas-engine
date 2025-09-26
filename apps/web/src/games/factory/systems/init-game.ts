@@ -1,6 +1,8 @@
 import {
   AssetServer,
   Camera2D,
+  Collider2D,
+  RigidBody2D,
   Sprite,
   sys,
   Transform,
@@ -44,4 +46,5 @@ export const initGame = sys(({ commands }) => {
   const cam = new Camera2D(commands.getResource(Viewport));
   cam.zoom = 2.1;
   commands.spawn(cam);
+  cam.transform.setPosition({ x: 100, y: 100 });
 });

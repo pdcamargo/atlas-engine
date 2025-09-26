@@ -34,7 +34,7 @@ export class Camera2D {
       const t = this.#followLerp;
       const nextX = currentX + (targetX - currentX) * t;
       const nextY = currentY + (targetY - currentY) * t;
-      this.#transform.position = { x: nextX, y: nextY } as any;
+      this.#transform.position.set(nextX, nextY);
     }
 
     const zoom = Math.max(0.0001, this.zoom);

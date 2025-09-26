@@ -30,6 +30,10 @@ export class FactoryGamePlugin implements EcsPlugin {
       .addPlugins(
         new DefaultPlugin({
           canvas: document.querySelector<HTMLCanvasElement>("canvas"),
+          gravity: {
+            x: 0,
+            y: 0,
+          },
         })
       )
       .addStartupSystems(createSet("GameSetup", initGame, initTileMap))

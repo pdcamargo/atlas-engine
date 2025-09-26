@@ -47,6 +47,7 @@ export class SceneGraph {
 
   constructor(root?: PIXI.Container | null) {
     this.#stage = new PIXI.Container();
+
     this.#root = root ?? new PIXI.Container();
 
     this.#stage.addChild(this.#root);

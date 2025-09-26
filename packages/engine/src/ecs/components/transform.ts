@@ -43,6 +43,11 @@ export class Transform {
     this.#isDirty = true;
   }
 
+  public setRotation(rotation: number) {
+    this.#rotation = rotation;
+    this.#isDirty = true;
+  }
+
   public set scale(scale: PointLike) {
     this.#scale.copyFrom(scale);
     this.#isDirty = true;

@@ -110,6 +110,11 @@ export class Input {
       this.#hasMouseWheel = true;
     });
 
+    this.#container.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
     // Ensure the container can receive focus for keyboard events
     if (this.#container instanceof HTMLElement) {
       this.#container.tabIndex = -1;

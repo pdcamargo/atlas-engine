@@ -35,7 +35,7 @@ export const addTilesSystem = sys(({ commands }) => {
 
   const input = commands.getResource(Input);
 
-  if (input.justPressed(KeyCode.MouseLeft)) {
+  if (input.pressed(KeyCode.MouseLeft)) {
     const builds = commands.getResource(BuildRequests);
     builds.enqueueFloor(
       userInteractionState.hoveredTile.x,
