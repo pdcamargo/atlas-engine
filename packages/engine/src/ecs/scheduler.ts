@@ -181,6 +181,35 @@ export class Scheduler {
     return this;
   }
 
+  public configureSet(
+    setId: SystemSetId,
+    type: SystemType,
+    config: {
+      predicates?: import("./types").RunIfFn[];
+      beforeSets?: SystemSetId[];
+      afterSets?: SystemSetId[];
+      beforeLabels?: string[];
+      afterLabels?: string[];
+    }
+  ): this {
+    if (config.beforeSets) {
+      this.addSetBeforeSet(setId, config.beforeSets, type);
+    }
+    if (config.afterSets) {
+      this.addSetAfterSet(setId, config.afterSets, type);
+    }
+    if (config.beforeLabels) {
+      this.addSetBeforeLabel(setId, config.beforeLabels, type);
+    }
+    if (config.afterLabels) {
+      this.addSetAfterLabel(setId, config.afterLabels, type);
+    }
+    if (config.predicates) {
+      this.addSetRunIf(setId, config.predicates, type);
+    }
+    return this;
+  }
+
   #normalize(input: SystemBuilderInput): SystemDescriptor {
     if (typeof input === "function") {
       return {

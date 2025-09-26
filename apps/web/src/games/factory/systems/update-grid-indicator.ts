@@ -21,6 +21,28 @@ export const updateGridIndicator = sys(({ commands }) => {
       x: userInteraction.hoveredTile.x * grid.tileSize,
       y: userInteraction.hoveredTile.y * grid.tileSize,
     });
+
+    let hasCollision = false;
+
+    if (
+      userInteraction.hoveredMetadata?.type === "cell" &&
+      userInteraction.hoveredMetadata.value.blocksCollision
+    ) {
+      hasCollision = true;
+    }
+
+    if (
+      userInteraction.hoveredMetadata?.type === "object" &&
+      userInteraction.hoveredMetadata.value.blocks
+    ) {
+      hasCollision = true;
+    }
+
+    if (hasCollision) {
+      sprite.get().tint = "red";
+    } else {
+      sprite.get().tint = "white";
+    }
   } else {
     sprite.get().visible = false;
   }

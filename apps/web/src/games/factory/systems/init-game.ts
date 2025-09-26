@@ -1,8 +1,6 @@
 import {
   AssetServer,
   Camera2D,
-  Collider2D,
-  RigidBody2D,
   Sprite,
   sys,
   Transform,
