@@ -1,5 +1,5 @@
 import { QueryBuilder, Renderable, Sprite, Transform } from "@repo/engine";
-import { GridIndicator } from "../components/grid-indicator";
+import { GridIndicator } from "../components/flags";
 
 export const assetIndicatorQuery = new QueryBuilder(
   Transform,

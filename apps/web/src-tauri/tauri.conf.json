@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "web",
-        "width": 1600,
+        "width": 1350,
         "height": 720,
         "resizable": true,
         "fullscreen": false,

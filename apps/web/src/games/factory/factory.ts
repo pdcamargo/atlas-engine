@@ -9,6 +9,7 @@ import { initTileMap } from "./systems/init-tilemap";
 import { applyBuildRequests } from "./systems/apply-build-requests";
 import { GameState } from "./resources/game-state";
 import { addTilesSystem, buildWorld } from "./systems/build-world";
+import { movePlayer } from "./systems/move-player";
 
 class ChunkSettings {
   readonly size = 16;
@@ -43,7 +44,8 @@ export class FactoryGamePlugin implements EcsPlugin {
           updateGridIndicator,
           handleHoveredTile,
           applyBuildRequests,
-          addTilesSystem
+          addTilesSystem,
+          movePlayer
         ),
         createSet("GameSetup", buildWorld)
       )
