@@ -5,6 +5,7 @@ import {
   addSpriteToScene,
   addTileMapToScene,
   renderScene,
+  resizeRenderer,
   updateAnimatedSprites,
   updateTransforms,
 } from "./systems";
@@ -28,7 +29,8 @@ export class Renderer2DPlugin implements EcsPlugin {
           addTileMapToScene,
           addSpriteToScene,
           updateTransforms,
-          updateAnimatedSprites
+          updateAnimatedSprites,
+          resizeRenderer
         )
       )
       .addRenderSystems(createSet(Renderer2DSet, renderScene));

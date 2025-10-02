@@ -20,6 +20,13 @@ export type ViewportOptions = {
   canvas?: HTMLCanvasElement | null;
 };
 
+export class ViewportResizeEvent {
+  constructor(
+    public readonly width: number,
+    public readonly height: number
+  ) {}
+}
+
 export class ViewportPlugin implements EcsPlugin {
   constructor(public readonly options?: ViewportOptions) {}
 
@@ -34,6 +41,21 @@ export class ViewportPlugin implements EcsPlugin {
       canvas.height = container.clientHeight;
     }
 
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        app.events
+          .writer(ViewportResizeEvent)
+          .send(
+            new ViewportResizeEvent(
+              entry.contentRect.width,
+              entry.contentRect.height
+            )
+          );
+      }
+    });
+    resizeObserver.observe(container);
+
     app.setResource(new Viewport(container, canvas));
+    app.addEvent(ViewportResizeEvent);
   }
 }

@@ -81,6 +81,10 @@ export class EventReader<T> {
     }
     return events;
   }
+
+  public hasEventsReady() {
+    return this.read().length > 0;
+  }
 }
 
 export class Events {

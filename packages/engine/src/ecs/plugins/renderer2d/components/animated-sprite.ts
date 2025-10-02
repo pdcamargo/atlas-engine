@@ -15,7 +15,7 @@ export type AnimationFrame = SpriteFrame & {
 };
 
 export type AnimationId = string | number | symbol;
-export type Animation = {
+export type AnimatedSpriteAnimation = {
   id: AnimationId;
   frames: AnimationFrame[];
   /** Optional per-animation loop flag. Falls back to AnimatedSpriteOptions.loop if undefined */
@@ -30,9 +30,11 @@ export type Animation = {
 
 export type AnimatedSpriteOptions = {
   anchor?: { x: number; y: number };
-  animations: Array<Animation> | ReadonlyArray<Animation>;
+  animations:
+    | Array<AnimatedSpriteAnimation>
+    | ReadonlyArray<AnimatedSpriteAnimation>;
   defaultAnimationId?: AnimationId;
-  texture: Texture2D;
+  texture?: Texture2D;
   useFrameEndEvents?: boolean;
   useAnimationEndEvents?: boolean;
   /** Default loop behavior if not specified on the animation. Defaults to true */
@@ -52,13 +54,13 @@ export type FrameEndEventConstructor = new (
 
 export type AnimationEndEventConstructor = new (
   animatedSprite: AnimatedSprite,
-  animation: Animation
+  animation: AnimatedSpriteAnimation
 ) => any;
 
 export class AnimatedSprite {
-  #texture: Texture2D;
+  #texture: Texture2D | null;
   #sprite?: PIXI.Sprite;
-  #animationsById: Map<AnimationId, Animation> = new Map();
+  #animationsById: Map<AnimationId, AnimatedSpriteAnimation> = new Map();
   #currentAnimationId!: AnimationId;
   #tileCache: Map<string, PIXI.Texture> = new Map();
   #options: AnimatedSpriteOptions;
@@ -70,7 +72,7 @@ export class AnimatedSprite {
   public isPlaying = true;
 
   constructor(options: AnimatedSpriteOptions) {
-    this.#texture = options.texture;
+    this.#texture = options.texture ?? null;
     this.#options = options;
 
     if (!options.animations || options.animations.length === 0) {
@@ -93,7 +95,7 @@ export class AnimatedSprite {
   }
 
   #resolveTextureFor = (
-    animation: Animation,
+    animation: AnimatedSpriteAnimation,
     frame?: AnimationFrame
   ): Texture2D => {
     const frameTexture = frame?.texture;
@@ -136,7 +138,7 @@ export class AnimatedSprite {
     return this.currentAnimation.frames;
   }
 
-  public get currentAnimation(): Animation {
+  public get currentAnimation(): AnimatedSpriteAnimation {
     const anim = this.#animationsById.get(this.#currentAnimationId);
     if (!anim) throw new Error("No current animation set");
     return anim;
@@ -156,21 +158,29 @@ export class AnimatedSprite {
     if (this.isAttached()) return false;
 
     // Collect all referenced textures (default, animations, frames)
-    const textures = new Set<Texture2D>();
-    if (this.#texture) textures.add(this.#texture);
+    const textures: Array<Texture2D> = [];
+    if (this.#texture) {
+      textures.push(this.#texture);
+    }
+
     for (const anim of this.#animationsById.values()) {
-      if (anim.texture) textures.add(anim.texture);
+      if (anim.texture) {
+        textures.push(anim.texture);
+      }
+
       for (const frame of anim.frames) {
-        if (frame.texture) textures.add(frame.texture);
+        if (frame.texture) {
+          textures.push(frame.texture);
+        }
       }
     }
 
     // Ensure at least one texture exists and all are loaded
-    if (textures.size === 0) return false;
-    for (const tex of textures) {
-      if (!tex.isLoaded()) return false;
+    if (textures.length === 0) {
+      return false;
     }
-    return true;
+
+    return textures.every((t) => t.isLoaded());
   }
 
   public attachTo(graphOrContainer: SceneGraph) {
@@ -209,8 +219,8 @@ export class AnimatedSprite {
     return subTexture(
       this.#tileCache,
       basePixiTexture!,
-      frame.x,
-      frame.y,
+      frame.x * frame.width,
+      frame.y * frame.height,
       frame.width,
       frame.height
     );

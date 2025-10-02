@@ -1,4 +1,4 @@
-import { sys, Time, Transform } from "../../..";
+import { sys, Time, Transform, ViewportResizeEvent } from "../../..";
 import { QueryBuilder } from "../../commands";
 
 import {
@@ -29,6 +29,17 @@ export const animatedSpritesToUpdateTransformQuery = new QueryBuilder(
   AnimatedSprite,
   Renderable
 );
+
+export const resizeRenderer = sys(({ commands, events }) => {
+  const resizeEvent = events.reader(ViewportResizeEvent);
+  const renderer = commands.getResource(Renderer2D);
+
+  const [resize] = resizeEvent.read() ?? [];
+
+  if (resize) {
+    renderer.resize(resize.width, resize.height);
+  }
+});
 
 export const addTileMapToScene = sys(({ commands }) => {
   const sceneGraph = commands.getResource(SceneGraph);

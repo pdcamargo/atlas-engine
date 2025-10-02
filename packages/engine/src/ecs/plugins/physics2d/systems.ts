@@ -1,11 +1,18 @@
 import { sys } from "../../system_builder";
 import * as RAPIER from "@dimforge/rapier2d";
-import { Collider2D, RigidBody2DHandle, Velocity } from "./components";
+import {
+  Collider2D,
+  Damping,
+  GravityScale,
+  RigidBody2DHandle,
+  Velocity,
+} from "./components";
 import {
   rigidBody2DToUpdateTransformQuery,
   unprocessedRigidBodies2DQuery,
 } from "./queries";
 import { Physics2DWorld, Physics2DWorldSettings } from "./resources";
+import { QueryBuilder } from "../../..";
 
 export const processRigidBodies = sys(({ commands }) => {
   const world = commands.getResource(Physics2DWorld);
@@ -39,12 +46,20 @@ export const processRigidBodies = sys(({ commands }) => {
       );
       bodyDesc.setRotation(transform.rotation * (Math.PI / 180));
 
-      if (rigidBody2D.gravityScale !== undefined)
-        bodyDesc.setGravityScale(rigidBody2D.gravityScale);
-      if (rigidBody2D.linearDamping !== undefined)
-        bodyDesc.setLinearDamping(rigidBody2D.linearDamping);
-      if (rigidBody2D.angularDamping !== undefined)
-        bodyDesc.setAngularDamping(rigidBody2D.angularDamping);
+      const gravityScale = commands.tryGetComponent(entityId, GravityScale);
+      if (gravityScale) {
+        bodyDesc.setGravityScale(gravityScale.gravityScale);
+      }
+
+      const damping = commands.tryGetComponent(entityId, Damping);
+      if (damping) {
+        if (damping.linearDamping !== undefined) {
+          bodyDesc.setLinearDamping(damping.linearDamping);
+        }
+        if (damping.angularDamping !== undefined) {
+          bodyDesc.setAngularDamping(damping.angularDamping);
+        }
+      }
 
       // Initial velocity if present
       const vel = commands.tryGetComponent(entityId, Velocity);
@@ -116,22 +131,31 @@ export const syncRigidbodiesTransforms = sys(({ commands }) => {
 
       transform.setPosition({ x: translation.x * ppu, y: translation.y * ppu });
       // Rapier rotation is radians; Transform expects degrees
-      transform.setRotation((rotation as unknown as number) * (180 / Math.PI));
+      transform.setRotation(rotation * (180 / Math.PI));
     });
 })
   .label("update-transforms")
   .afterLabel("step-world");
+
+const velocityQuery = new QueryBuilder(Velocity, RigidBody2DHandle);
 
 export const applyVelocities = sys(({ commands }) => {
   const world = commands.getResource(Physics2DWorld);
   const settings = commands.getResource(Physics2DWorldSettings);
   const ppu = settings.pixelPerUnit;
 
-  commands.query(Velocity, RigidBody2DHandle).forEach((_, v, handle) => {
+  commands.query(velocityQuery).forEach((_, v, handle) => {
     const body = world.getRigidBody(handle.handle);
-    if (!body) return;
-    body.setLinvel({ x: v.linvel.x / ppu, y: v.linvel.y / ppu } as any, true);
-    if (v.angvel) body.setAngvel(v.angvel, true);
+
+    if (!body) {
+      return;
+    }
+
+    body.setLinvel({ x: v.linvel.x / ppu, y: v.linvel.y / ppu }, true);
+
+    if (v.angvel) {
+      body.setAngvel(v.angvel, true);
+    }
   });
 })
   .label("apply-velocities")

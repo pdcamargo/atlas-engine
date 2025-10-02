@@ -25,6 +25,10 @@ export class Renderer2D {
     this.#isInitialized = true;
   }
 
+  public resize(width: number, height: number) {
+    this.#renderer.resize(width, height);
+  }
+
   public isInitialized() {
     return this.#isInitialized && this.#renderer !== undefined;
   }

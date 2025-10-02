@@ -6,36 +6,13 @@ export type RigidBody2DType =
 
 export class RigidBody2D {
   #type: RigidBody2DType;
-  #gravityScale?: number;
-  #linearDamping?: number;
-  #angularDamping?: number;
 
-  constructor(options?: {
-    type?: RigidBody2DType;
-    gravityScale?: number;
-    linearDamping?: number;
-    angularDamping?: number;
-  }) {
+  constructor(options?: { type?: RigidBody2DType }) {
     this.#type = options?.type ?? "dynamic";
-    this.#gravityScale = options?.gravityScale;
-    this.#linearDamping = options?.linearDamping;
-    this.#angularDamping = options?.angularDamping;
   }
 
   public get type(): RigidBody2DType {
     return this.#type;
-  }
-
-  public get gravityScale(): number | undefined {
-    return this.#gravityScale;
-  }
-
-  public get linearDamping(): number | undefined {
-    return this.#linearDamping;
-  }
-
-  public get angularDamping(): number | undefined {
-    return this.#angularDamping;
   }
 
   public static dynamic(
@@ -63,6 +40,64 @@ export class RigidBody2D {
   }
 }
 
+export class Damping {
+  #linearDamping?: number;
+  #angularDamping?: number;
+
+  public isDirty = true;
+
+  constructor(options?: { linearDamping?: number; angularDamping?: number }) {
+    this.#linearDamping = options?.linearDamping;
+    this.#angularDamping = options?.angularDamping;
+    this.isDirty = true;
+  }
+
+  public get linearDamping(): number | undefined {
+    return this.#linearDamping;
+  }
+
+  public get angularDamping(): number | undefined {
+    return this.#angularDamping;
+  }
+
+  public set linearDamping(damping: number) {
+    this.#linearDamping = damping;
+    this.isDirty = true;
+  }
+
+  public set angularDamping(damping: number) {
+    this.#angularDamping = damping;
+    this.isDirty = true;
+  }
+
+  public static fromValues(linearDamping: number, angularDamping: number) {
+    return new Damping({ linearDamping, angularDamping });
+  }
+
+  public static zero() {
+    return Damping.fromValues(0, 0);
+  }
+}
+export class GravityScale {
+  #gravityScale: number;
+
+  public isDirty = true;
+
+  constructor(gravityScale = 1) {
+    this.#gravityScale = gravityScale;
+    this.isDirty = true;
+  }
+
+  public get gravityScale(): number {
+    return this.#gravityScale;
+  }
+
+  public set gravityScale(gravityScale: number) {
+    this.#gravityScale = gravityScale;
+    this.isDirty = true;
+  }
+}
+
 /**
  * This will only be present on the entities that have a rigid body that was already processed and created
  */
@@ -74,9 +109,12 @@ export class Velocity {
   #linvel: { x: number; y: number };
   #angvel: number;
 
+  public isDirty = true;
+
   constructor(initialVelocity?: { x?: number; y?: number; ang?: number }) {
     this.#linvel = { x: initialVelocity?.x ?? 0, y: initialVelocity?.y ?? 0 };
     this.#angvel = initialVelocity?.ang ?? 0;
+    this.isDirty = true;
   }
 
   public get linvel() {
@@ -85,6 +123,7 @@ export class Velocity {
 
   public set linvel(v: { x: number; y: number }) {
     this.#linvel = v;
+    this.isDirty = true;
   }
 
   public get angvel() {
@@ -93,6 +132,7 @@ export class Velocity {
 
   public set angvel(v: number) {
     this.#angvel = v;
+    this.isDirty = true;
   }
 
   public static zero() {

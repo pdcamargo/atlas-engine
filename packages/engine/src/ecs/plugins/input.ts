@@ -111,8 +111,10 @@ export class Input {
     });
 
     this.#container.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+      if (!event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     });
 
     // Ensure the container can receive focus for keyboard events

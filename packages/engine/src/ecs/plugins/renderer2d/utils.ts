@@ -15,12 +15,7 @@ export function subTexture(
 
   const texture = new PIXI.Texture({
     source: base.source,
-    frame: new PIXI.Rectangle(
-      tileX * tileWidth,
-      tileY * tileHeight,
-      tileWidth,
-      tileHeight
-    ),
+    frame: new PIXI.Rectangle(tileX, tileY, tileWidth, tileHeight),
   });
 
   cache.set(key, texture);

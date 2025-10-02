@@ -24,6 +24,7 @@ export class Scheduler {
     new Map();
   #setAfterLabelsByPhase: Map<string, Map<SystemSetId, Set<string>>> =
     new Map();
+  #orderCache: Map<SystemType, ScheduledSystem[]> = new Map();
 
   #commands?: Commands;
   #events?: Events;
@@ -31,6 +32,7 @@ export class Scheduler {
   public addSystem(type: SystemType, input: SystemBuilderInput): this {
     const desc = this.#normalize(input);
     this.#systems.push({ type, ...desc });
+    this.#invalidateOrderCache(type);
     return this;
   }
 
@@ -38,20 +40,25 @@ export class Scheduler {
     type: SystemType,
     app: import("../index").App
   ): Promise<void> {
-    const systems = this.#systems.filter((s) => s.type === type);
-    const ordered = this.#order(type, systems);
+    const ordered = this.#getOrderedSystems(type);
     for (const s of ordered) {
       // runIf gate (system-level and set-level, AND semantics)
       const preds: import("./types").RunIfFn[] = [];
       const runIfVal = s.runIf;
-      if (Array.isArray(runIfVal)) preds.push(...runIfVal);
-      else if (runIfVal)
+      if (Array.isArray(runIfVal)) {
+        preds.push(...runIfVal);
+      } else if (runIfVal) {
         preds.push(runIfVal as unknown as import("./types").RunIfFn);
+      }
       for (const setId of s.sets) {
         const arrAll = this.#getSetRunIf("*", setId);
         const arrPhase = this.#getSetRunIf(type, setId);
-        if (arrAll) preds.push(...arrAll);
-        if (arrPhase) preds.push(...arrPhase);
+        if (arrAll) {
+          preds.push(...arrAll);
+        }
+        if (arrPhase) {
+          preds.push(...arrPhase);
+        }
       }
       if (preds.length > 0) {
         const ctx = {
@@ -66,7 +73,9 @@ export class Scheduler {
             break;
           }
         }
-        if (!ok) continue;
+        if (!ok) {
+          continue;
+        }
       }
       await this.#invokeSystem(s, app);
     }
@@ -139,6 +148,7 @@ export class Scheduler {
     const set = map.get(setId) ?? new Set<SystemSetId>();
     for (const b of before) set.add(b);
     map.set(setId, set);
+    this.#invalidateOrderCache(type);
     return this;
   }
 
@@ -152,6 +162,7 @@ export class Scheduler {
     const set = map.get(setId) ?? new Set<SystemSetId>();
     for (const a of after) set.add(a);
     map.set(setId, set);
+    this.#invalidateOrderCache(type);
     return this;
   }
 
@@ -165,6 +176,7 @@ export class Scheduler {
     const set = map.get(setId) ?? new Set<string>();
     for (const l of beforeLabels) set.add(l);
     map.set(setId, set);
+    this.#invalidateOrderCache(type);
     return this;
   }
 
@@ -178,6 +190,7 @@ export class Scheduler {
     const set = map.get(setId) ?? new Set<string>();
     for (const l of afterLabels) set.add(l);
     map.set(setId, set);
+    this.#invalidateOrderCache(type);
     return this;
   }
 
@@ -249,6 +262,15 @@ export class Scheduler {
     const name = (fn as { name?: string }).name ?? "system";
     const suffix = Math.random().toString(36).slice(2, 8);
     return `${name}-${suffix}`;
+  }
+
+  #getOrderedSystems(type: SystemType): ScheduledSystem[] {
+    const cached = this.#orderCache.get(type);
+    if (cached) return cached;
+    const systems = this.#systems.filter((s) => s.type === type);
+    const ordered = this.#order(type, systems);
+    this.#orderCache.set(type, ordered);
+    return ordered;
   }
 
   #order(type: SystemType, systems: ScheduledSystem[]): ScheduledSystem[] {
@@ -405,5 +427,13 @@ export class Scheduler {
   ): Set<string> | undefined {
     const map = this.#setAfterLabelsByPhase.get(type as unknown as string);
     return map?.get(setId);
+  }
+
+  #invalidateOrderCache(type?: SystemType): void {
+    if (type === undefined) {
+      this.#orderCache.clear();
+      return;
+    }
+    this.#orderCache.delete(type);
   }
 }

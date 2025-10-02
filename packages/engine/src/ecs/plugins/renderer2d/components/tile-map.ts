@@ -63,10 +63,10 @@ export class TileMap {
     const slice = subTexture(
       this.#tileCache,
       texture,
-      tileX,
-      tileY,
-      options.tileWidth || this.options.tileWidth,
-      options.tileHeight || this.options.tileHeight
+      tileX * (options.tileWidth ?? this.options.tileWidth),
+      tileY * (options.tileHeight ?? this.options.tileHeight),
+      options.tileWidth ?? this.options.tileWidth,
+      options.tileHeight ?? this.options.tileHeight
     );
 
     const sprite = new PIXI.Sprite(slice);
