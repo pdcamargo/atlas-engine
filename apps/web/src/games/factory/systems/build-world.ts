@@ -1,28 +1,30 @@
 import { Input, KeyCode, sys } from "@repo/engine";
 import { GameState } from "../resources/game-state";
 import { BuildRequests } from "../resources/build-requests";
-import { TilesType } from "../resources/world-grid";
+import { TilesType, WorldGrid } from "../resources/world-grid";
 import { ObjectsType } from "../data/tiles";
 import { UserInteractionState } from "../resources/user-interaction";
+import { Conveyor } from "../components/flags";
 
 export const buildWorld = sys(({ commands }) => {
   const builds = commands.getResource(BuildRequests);
-  builds.enqueueFloor(0, 0, TilesType.Grass);
-  builds.enqueueFloor(1, 0, TilesType.Grass);
-  builds.enqueueFloor(2, 0, TilesType.Grass);
-  builds.enqueueFloor(0, 1, TilesType.Grass);
-  builds.enqueueFloor(1, 1, TilesType.Grass);
-  builds.enqueueFloor(2, 1, TilesType.Grass);
-  builds.enqueueFloor(3, 1, TilesType.Grass);
-  builds.enqueueFloor(4, 1, TilesType.Grass);
-  builds.enqueueFloor(5, 1, TilesType.Grass);
+  const grid = commands.getResource(WorldGrid);
 
-  builds.enqueueObject(0, 0, ObjectsType.Conveyor);
-  builds.enqueueObject(1, 0, ObjectsType.Conveyor);
-  builds.enqueueObject(2, 0, ObjectsType.Conveyor);
-  builds.enqueueObject(3, 0, ObjectsType.Conveyor);
-  builds.enqueueObject(4, 0, ObjectsType.Conveyor);
-  builds.enqueueObject(5, 0, ObjectsType.Conveyor);
+  for (let x = 0; x < grid.chunkSize; x++) {
+    for (let y = 0; y < grid.chunkSize; y++) {
+      builds.enqueueFloor(x, y, TilesType.Grass);
+    }
+  }
+
+  builds.enqueueObject(6, 6, ObjectsType.Conveyor, {
+    components: [new Conveyor("up", 100)],
+  });
+  builds.enqueueObject(6, 7, ObjectsType.Conveyor, {
+    components: [new Conveyor("right", 100)],
+  });
+  builds.enqueueObject(6, 8, ObjectsType.Conveyor, {
+    components: [new Conveyor("right", 100)],
+  });
 
   const gameState = commands.getResource(GameState);
   gameState.hasBuiltWorld = true;

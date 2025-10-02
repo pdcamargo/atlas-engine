@@ -67,6 +67,7 @@ export const applyBuildRequests = sys(({ commands }) => {
       });
     } else if (req.type === "object") {
       const objConf = objectsConfig[req.object as ObjectsType];
+      console.log(objConf);
       if (!objConf) continue;
 
       // Try place in logical grid first (ensures collision rules)
@@ -75,6 +76,7 @@ export const applyBuildRequests = sys(({ commands }) => {
       const blocks = req.blocks ?? true;
 
       if (!grid.canAddTile(req.x, req.y, width, height, { blocks })) {
+        console.log("Cannot add object", req.x, req.y, width, height, blocks);
         // skip invalid placements
         continue;
       }
@@ -99,14 +101,16 @@ export const applyBuildRequests = sys(({ commands }) => {
             texture: assetServer.loadTexture(objConf.texture)[0],
             animations: objConf.animations,
           }),
-          Transform.fromPosition({ x: px, y: py })
+          Transform.fromPosition({ x: px, y: py }),
+          ...(req.components ?? [])
         );
       } else if ("frame" in objConf) {
         // Static sprite
         const [texture] = assetServer.loadTexture(objConf.texture);
         commands.spawn(
           new Sprite(texture, objConf.frame),
-          Transform.fromPosition({ x: px, y: py })
+          Transform.fromPosition({ x: px, y: py }),
+          ...(req.components ?? [])
         );
       } else {
         throw new Error("Invalid object configuration");

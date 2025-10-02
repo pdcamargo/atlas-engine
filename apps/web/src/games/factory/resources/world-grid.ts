@@ -423,7 +423,7 @@ export class WorldGrid extends Grid {
   constructor() {
     super({
       tileSize: 16,
-      chunkSize: 16,
+      chunkSize: 12,
       initialChunks: [{ cx: 0, cy: 0 }],
     });
   }

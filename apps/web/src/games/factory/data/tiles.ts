@@ -3,6 +3,7 @@ import { TilesType } from "../resources/world-grid";
 export enum ObjectsType {
   GridIndicator = "grid-indicator",
   Conveyor = "conveyor",
+  Tree = "tree-1",
 }
 
 export const tilesConfig = {
@@ -56,6 +57,7 @@ export const objectsConfig = {
       width: 16,
       height: 16,
     },
+    components: [],
   },
   [ObjectsType.Conveyor]: {
     id: ObjectsType.Conveyor,
@@ -73,6 +75,17 @@ export const objectsConfig = {
         })),
       },
     ],
+  },
+  [ObjectsType.Tree]: {
+    id: ObjectsType.Tree,
+    name: "Tree",
+    texture: "/sprites/Trees/Trees & vegetation Tileset1.png",
+    frame: {
+      x: 32,
+      y: 96,
+      width: 32,
+      height: 16 * 5,
+    },
   },
 } as const;
 

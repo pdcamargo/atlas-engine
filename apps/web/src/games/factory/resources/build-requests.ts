@@ -8,6 +8,7 @@ export type FloorPlacementRequest = {
   x: number;
   y: number;
   tile: FloorTileId;
+  components?: unknown[];
 };
 
 export type ObjectPlacementRequest = {
@@ -19,6 +20,7 @@ export type ObjectPlacementRequest = {
   height?: number;
   blocks?: boolean;
   meta?: Record<string, unknown>;
+  components?: unknown[];
 };
 
 export type BuildRequest = FloorPlacementRequest | ObjectPlacementRequest;
@@ -39,6 +41,7 @@ export class BuildRequests {
       height?: number;
       blocks?: boolean;
       meta?: Record<string, unknown>;
+      components?: unknown[];
     }
   ): void {
     this.#queue.push({
@@ -50,6 +53,7 @@ export class BuildRequests {
       height: options?.height,
       blocks: options?.blocks,
       meta: options?.meta,
+      components: options?.components,
     });
   }
 
