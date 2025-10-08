@@ -9,10 +9,14 @@ export class Transform {
 
   #isDirty: boolean;
 
-  constructor() {
-    this.#position = new Point(0, 0);
-    this.#rotation = 0;
-    this.#scale = new Point(1, 1);
+  constructor(
+    position: { x: number; y: number } = { x: 0, y: 0 },
+    rotation: number = 0,
+    scale: { x: number; y: number } = { x: 1, y: 1 }
+  ) {
+    this.#position = new Point(position.x, position.y);
+    this.#rotation = rotation;
+    this.#scale = new Point(scale.x, scale.y);
     this.#isDirty = false;
   }
 

@@ -2,6 +2,131 @@ import { Children, Parent } from "./components";
 import type { ComponentClass, Entity } from "./types";
 import type { World } from "./world";
 
+export type BundleConstructor<S> = {
+  new (): never;
+  readonly shape: S;
+  readonly __isBundle: true;
+};
+
+type RequiredComponent<C extends new (...args: any) => any> = {
+  __required: true;
+  __ctor: C;
+};
+
+export function required<C extends new (...args: any) => any>(
+  ctor: C
+): RequiredComponent<C> {
+  return { __required: true, __ctor: ctor };
+}
+
+function isRequiredComponent(value: any): value is RequiredComponent<any> {
+  return (
+    value && value.__required === true && typeof value.__ctor === "function"
+  );
+}
+
+type BundleOverridesShape<S> = {
+  [K in keyof S as S[K] extends RequiredComponent<any>
+    ? K
+    : never]: S[K] extends RequiredComponent<infer C>
+    ? ConstructorParameters<C>
+    : never;
+} & {
+  [K in keyof S as S[K] extends RequiredComponent<any>
+    ? never
+    : K]?: S[K] extends new (...args: any) => any
+    ? ConstructorParameters<S[K]>
+    : S[K] extends BundleConstructor<infer Nested>
+      ? BundleOverridesShape<Nested>
+      : never;
+};
+
+export type BundleOverrides<B extends BundleConstructor<any>> =
+  BundleOverridesShape<B["shape"]>;
+
+type HasRequiredComponents<S> = {
+  [K in keyof S]: S[K] extends RequiredComponent<any> ? K : never;
+}[keyof S] extends never
+  ? false
+  : true;
+
+export function defineBundle<
+  S extends Record<
+    string,
+    | BundleConstructor<any>
+    | (new (...args: any) => any)
+    | RequiredComponent<any>
+  >,
+>(shape: S): BundleConstructor<S> {
+  class B {
+    private constructor() {}
+    static readonly shape = shape;
+    static readonly __isBundle = true as const;
+  }
+  return B as unknown as BundleConstructor<S>;
+}
+
+defineBundle.required = required;
+
+function isBundleConstructor(value: unknown): value is BundleConstructor<any> {
+  return (
+    !!value && typeof value === "function" && (value as any).__isBundle === true
+  );
+}
+
+function materializeBundle(
+  shape: Record<string, any>,
+  overrides?: Record<string, any>
+): unknown[] {
+  const instances: unknown[] = [];
+  for (const key of Object.keys(shape)) {
+    const descriptor = shape[key]!;
+    const overrideValue = overrides?.[key];
+
+    if (isBundleConstructor(descriptor)) {
+      const nestedShape = descriptor.shape;
+      const nestedOverrides = overrideValue;
+      instances.push(...materializeBundle(nestedShape, nestedOverrides));
+      continue;
+    }
+
+    // Handle required component
+    if (isRequiredComponent(descriptor)) {
+      const C = descriptor.__ctor;
+      if (overrideValue === undefined) {
+        throw new Error(
+          `Required component '${key}' must have constructor arguments provided`
+        );
+      }
+      if (Array.isArray(overrideValue)) {
+        instances.push(new C(...overrideValue));
+      } else {
+        throw new Error(
+          `Required component '${key}' must have constructor arguments as array`
+        );
+      }
+      continue;
+    }
+
+    // Component constructor
+    const C = descriptor as new (...args: any[]) => any;
+    if (overrideValue === undefined) {
+      instances.push(new C());
+      continue;
+    }
+
+    // overrideValue must be a tuple of constructor arguments
+    if (Array.isArray(overrideValue)) {
+      instances.push(new C(...overrideValue));
+      continue;
+    }
+
+    // Shouldn't reach here with proper typing, but fallback for safety
+    instances.push(new C());
+  }
+  return instances;
+}
+
 function entityCommand(entity: Entity, commands: Commands) {
   return {
     pushChildren: (...childrenIds: Entity[]) => {
@@ -81,7 +206,68 @@ export class Commands {
     return entityCommand(entity, this);
   }
 
-  public spawn(...components: unknown[]) {
+  public spawnBundle<B extends BundleConstructor<any>>(
+    bundle: B,
+    ...args: HasRequiredComponents<B["shape"]> extends true
+      ? [overrides: BundleOverrides<B>]
+      : [overrides?: BundleOverrides<B>]
+  ): ReturnType<typeof spawnEntityCommand> {
+    const [overrides] = args;
+    const instances = materializeBundle(bundle.shape, overrides as any);
+    const entity = this.#world.createEntity();
+    const record: Record<string, unknown> = {};
+    for (let i = 0; i < instances.length; i++) record[i] = instances[i];
+    this.#world.addComponents(entity, record);
+    return spawnEntityCommand(entity, this);
+  }
+
+  public spawn<T1 extends object>(
+    c1: T1
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<T1 extends object, T2 extends object>(
+    c1: T1,
+    c2: T2
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<T1 extends object, T2 extends object, T3 extends object>(
+    c1: T1,
+    c2: T2,
+    c3: T3
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+  >(c1: T1, c2: T2, c3: T3, c4: T4): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn(...components: any[]): ReturnType<typeof spawnEntityCommand> {
     const entity = this.#world.createEntity();
     const record: Record<string, unknown> = {};
     for (let i = 0; i < components.length; i++) {

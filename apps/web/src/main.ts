@@ -1,4 +1,5 @@
 import { FactoryGamePlugin } from "./games/factory";
+import { SlayGamePlugin } from "./games/slay";
 import "./style.css";
 
 import {
@@ -231,7 +232,7 @@ async function main() {
     // .addEvent(ResumeGameEvent)
     // .addEvent(QuitGameEvent)
     // .setResource(new GameState())
-    .addPlugins(new FactoryGamePlugin(), new DebugPlugin())
+    .addPlugins(new SlayGamePlugin(), new DebugPlugin())
     // .addStartupSystems(spawnPlayer)
     // .addUpdateSystems(buildWorld, resumeGame, updateFps)
     .run();

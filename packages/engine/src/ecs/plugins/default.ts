@@ -5,16 +5,11 @@ import { InputPlugin } from "./input";
 import { ViewportPlugin } from "./viewport";
 import { UiPlugin } from "./ui";
 import { Renderer2DPlugin } from "./renderer2d";
-import { Physics2DPlugin } from "./physics2d";
 import { FileSystemAdapter, FileSystemPlugin } from "./file-system";
 
 export type DefaultPluginOptions = {
   container?: HTMLElement | null;
   canvas?: HTMLCanvasElement | null;
-  gravity?: {
-    x: number;
-    y: number;
-  };
   fileSystemAdapter?: FileSystemAdapter;
 };
 
@@ -31,7 +26,6 @@ export class DefaultPlugin implements EcsPluginGroup {
       new InputPlugin(),
       new TimePlugin(),
       new AssetsPlugin(),
-      new Physics2DPlugin({ gravity: this.options?.gravity }),
       new Renderer2DPlugin(),
       new UiPlugin(),
     ];

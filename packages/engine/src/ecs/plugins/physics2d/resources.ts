@@ -21,6 +21,10 @@ export class Physics2DWorld {
     });
   }
 
+  public debugRender() {
+    return this.#world.debugRender();
+  }
+
   public step(eventQueue?: RAPIER.EventQueue, hooks?: RAPIER.PhysicsHooks) {
     this.#world.step(eventQueue, hooks);
   }

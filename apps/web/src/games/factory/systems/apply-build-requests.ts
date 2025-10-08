@@ -7,6 +7,7 @@ import {
   Transform,
   sys,
   Renderable,
+  Collider2D,
 } from "@repo/engine";
 import { BuildRequests, FloorTileId } from "../resources/build-requests";
 import { WorldGrid } from "../resources/world-grid";
@@ -65,6 +66,13 @@ export const applyBuildRequests = sys(({ commands }) => {
         tileWidth: tileConf.tile.width,
         tileHeight: tileConf.tile.height,
       });
+
+      if (blocks) {
+        commands.spawn(
+          Collider2D.rect(tileConf.tile.width, tileConf.tile.height),
+          Transform.fromPosition({ x: px, y: py })
+        );
+      }
     } else if (req.type === "object") {
       const objConf = objectsConfig[req.object as ObjectsType];
       console.log(objConf);
@@ -102,7 +110,8 @@ export const applyBuildRequests = sys(({ commands }) => {
             animations: objConf.animations,
           }),
           Transform.fromPosition({ x: px, y: py }),
-          ...(req.components ?? [])
+          ...(req.components ?? []),
+          ...(blocks ? [Collider2D.rect(width, height, { friction: 0 })] : [])
         );
       } else if ("frame" in objConf) {
         // Static sprite
@@ -110,7 +119,8 @@ export const applyBuildRequests = sys(({ commands }) => {
         commands.spawn(
           new Sprite(texture, objConf.frame),
           Transform.fromPosition({ x: px, y: py }),
-          ...(req.components ?? [])
+          ...(req.components ?? []),
+          ...(blocks ? [Collider2D.rect(width, height, { friction: 0 })] : [])
         );
       } else {
         throw new Error("Invalid object configuration");

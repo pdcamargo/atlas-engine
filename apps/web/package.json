@@ -10,7 +10,7 @@
     "lint": "eslint \"src/**/*.ts\""
   },
   "dependencies": {
-    "@repo/ui": "workspace:*"
+    "@tauri-apps/plugin-fs": "~2.4.2"
   },
   "devDependencies": {
     "@repo/engine": "workspace:*",

@@ -76,11 +76,7 @@ export const renderScene = sys(({ commands }) => {
   const sceneGraph = commands.getResource(SceneGraph);
   const [, camera] = commands.tryFind(Camera2D) ?? [];
 
-  if (!camera) {
-    return;
-  }
-
-  commands.getResource(Renderer2D).render(camera, sceneGraph);
+  commands.getResource(Renderer2D).render(sceneGraph, camera);
 });
 
 export const updateTransforms = sys(({ commands }) => {

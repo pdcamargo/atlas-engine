@@ -1,6 +1,6 @@
 import { QueryBuilder } from "../../commands";
 import { Transform } from "../../components";
-import { RigidBody2D, RigidBody2DHandle, Velocity } from "./components";
+import { Collider2D, Collider2DHandle, RigidBody2D, RigidBody2DHandle, Velocity } from "./components";
 
 // the physics will update the transform of a body
 export const rigidBody2DToUpdateTransformQuery = new QueryBuilder(
@@ -11,8 +11,14 @@ export const rigidBody2DToUpdateTransformQuery = new QueryBuilder(
 
 export const unprocessedRigidBodies2DQuery = new QueryBuilder(
   RigidBody2D,
-  Transform
+  Transform,
+  Collider2D
 ).without(RigidBody2DHandle);
+
+export const unprocessedColliders2DQuery = new QueryBuilder(
+  Collider2D,
+  Transform
+).without(RigidBody2D, Collider2DHandle);
 
 export const bodiesWithVelocityQuery = new QueryBuilder(
   Velocity,

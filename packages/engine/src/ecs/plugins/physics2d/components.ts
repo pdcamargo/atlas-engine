@@ -6,13 +6,23 @@ export type RigidBody2DType =
 
 export class RigidBody2D {
   #type: RigidBody2DType;
+  #fixedRotation: boolean;
 
-  constructor(options?: { type?: RigidBody2DType }) {
+  constructor(options?: { type?: RigidBody2DType; fixedRotation?: boolean }) {
     this.#type = options?.type ?? "dynamic";
+    this.#fixedRotation = options?.fixedRotation ?? false;
   }
 
   public get type(): RigidBody2DType {
     return this.#type;
+  }
+
+  public get fixedRotation(): boolean {
+    return this.#fixedRotation;
+  }
+
+  public set fixedRotation(fixedRotation: boolean) {
+    this.#fixedRotation = fixedRotation;
   }
 
   public static dynamic(
@@ -105,6 +115,17 @@ export class RigidBody2DHandle {
   constructor(public readonly handle: number) {}
 }
 
+/**
+ * This will only be present on the entities that have a collider that was already processed and created
+ *
+ * The handle will be the rigid body handle that the collider is attached to (created while processing the collider without a rigid body)
+ *
+ * The created rigidbody will be static
+ */
+export class Collider2DHandle {
+  constructor(public readonly handle: number) {}
+}
+
 export class Velocity {
   #linvel: { x: number; y: number };
   #angvel: number;
@@ -150,6 +171,7 @@ export class Collider2D {
   #density?: number;
   #friction?: number;
   #restitution?: number;
+  #offset?: { x: number; y: number };
 
   constructor(
     shape: Collider2DShape,
@@ -157,12 +179,14 @@ export class Collider2D {
       density?: number;
       friction?: number;
       restitution?: number;
+      offset?: { x: number; y: number };
     }
   ) {
     this.#shape = shape;
     this.#density = options?.density;
     this.#friction = options?.friction;
     this.#restitution = options?.restitution;
+    this.#offset = options?.offset;
   }
 
   public get shape(): Collider2DShape {
@@ -181,9 +205,22 @@ export class Collider2D {
     return this.#restitution;
   }
 
+  public get offset(): { x: number; y: number } | undefined {
+    return this.#offset;
+  }
+
+  public set offset(offset: { x: number; y: number } | undefined) {
+    this.#offset = offset;
+  }
+
   public static circle(
     radius: number,
-    options?: { density?: number; friction?: number; restitution?: number }
+    options?: {
+      density?: number;
+      friction?: number;
+      restitution?: number;
+      offset?: { x: number; y: number };
+    }
   ) {
     return new Collider2D({ kind: "circle", radius }, options);
   }
@@ -191,15 +228,29 @@ export class Collider2D {
   public static rect(
     width: number,
     height: number,
-    options?: { density?: number; friction?: number; restitution?: number }
+    options?: {
+      density?: number;
+      friction?: number;
+      restitution?: number;
+      offset?: { x: number; y: number };
+    }
   ) {
     return new Collider2D({ kind: "rect", width, height }, options);
   }
 
   public static polygon(
     points: { x: number; y: number }[],
-    options?: { density?: number; friction?: number; restitution?: number }
+    options?: {
+      density?: number;
+      friction?: number;
+      restitution?: number;
+      offset?: { x: number; y: number };
+    }
   ) {
     return new Collider2D({ kind: "polygon", points }, options);
   }
+}
+
+export class Sensor {
+  constructor() {}
 }

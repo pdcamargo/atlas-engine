@@ -4,8 +4,8 @@ import { EcsPlugin } from "../../plugin";
 export type FileSystemAdapter = {
   readJson<T = Record<string, unknown>>(path: string): Promise<T>;
   readFile(path: string): Promise<string>;
-  readFileBlob(path: string): Promise<Blob>;
-  writeFile(path: string, data: string): Promise<void>;
+  readFileBlob(path: string): Promise<Uint8Array<ArrayBuffer>>;
+  writeFile(path: string, data: Uint8Array | ReadableStream<Uint8Array> | string): Promise<void>;
   exists(path: string): Promise<boolean>;
   readDirectory(path: string): Promise<string[]>;
   createDirectory(path: string): Promise<void>;
@@ -24,7 +24,7 @@ export class FileSystem {
     return this.adapter.readFile(path);
   }
 
-  public readFileBlob(path: string): Promise<Blob> {
+  public readFileBlob(path: string): Promise<Uint8Array<ArrayBuffer>> {
     return this.adapter.readFileBlob(path);
   }
 
@@ -202,7 +202,7 @@ export class DefaultFileSystemAdapter implements FileSystemAdapter {
     return res.text();
   }
 
-  async readFileBlob(path: string): Promise<Blob> {
+  async readFileBlob(path: string): Promise<Uint8Array<ArrayBuffer>> {
     const res = await fetch(
       generateRoute(defaultAdapterRoutes.readFileBlob, path)
     );
@@ -214,7 +214,7 @@ export class DefaultFileSystemAdapter implements FileSystemAdapter {
       );
     }
 
-    return res.blob();
+    return new Uint8Array(await res.arrayBuffer());
   }
 }
 

@@ -1,7 +1,8 @@
 import "reflect-metadata";
 export { World } from "./ecs/world";
 export { SystemType } from "./ecs/types";
-export { Commands, QueryBuilder } from "./ecs/commands";
+export { Commands, QueryBuilder, defineBundle, required } from "./ecs/commands";
+export type { BundleConstructor, BundleOverrides } from "./ecs/commands";
 export type { EcsPlugin, EcsPluginGroup } from "./plugin";
 export { Events, EventWriter, EventReader } from "./ecs/events";
 export type { EventsApi } from "./ecs/events";

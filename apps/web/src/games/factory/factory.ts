@@ -1,4 +1,10 @@
-import { App, createSet, DefaultPlugin, EcsPlugin } from "@repo/engine";
+import {
+  App,
+  createSet,
+  DefaultPlugin,
+  EcsPlugin,
+  Physics2DPlugin,
+} from "@repo/engine";
 import { WorldGrid } from "./resources/world-grid";
 import { UserInteractionState } from "./resources/user-interaction";
 import { updateGridIndicator } from "./systems/update-grid-indicator";
@@ -10,6 +16,7 @@ import { applyBuildRequests } from "./systems/apply-build-requests";
 import { GameState } from "./resources/game-state";
 import { addTilesSystem, buildWorld } from "./systems/build-world";
 import { movePlayer } from "./systems/move-player";
+import { TauriFileSystemAdapter } from "../../plugins/file-system";
 
 class ChunkSettings {
   readonly size = 16;
@@ -30,12 +37,10 @@ export class FactoryGamePlugin implements EcsPlugin {
       .setResource(new WorldGrid())
       .addPlugins(
         new DefaultPlugin({
+          fileSystemAdapter: new TauriFileSystemAdapter(),
           canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-          gravity: {
-            x: 0,
-            y: 0,
-          },
-        })
+        }),
+        new Physics2DPlugin({ gravity: { x: 0, y: 0 } })
       )
       .addStartupSystems(createSet("GameSetup", initGame, initTileMap))
       .addUpdateSystems(

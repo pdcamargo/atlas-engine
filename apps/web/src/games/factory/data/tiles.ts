@@ -63,6 +63,7 @@ export const objectsConfig = {
     id: ObjectsType.Conveyor,
     name: "Conveyor",
     texture: "/sprites/Other/Conveyor.png",
+    blocksCollision: true,
     animations: [
       {
         id: "default",

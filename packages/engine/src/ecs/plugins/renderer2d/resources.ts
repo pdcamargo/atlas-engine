@@ -37,9 +37,9 @@ export class Renderer2D {
     this.#renderer.clear();
   }
 
-  public render(camera: Camera2D, sceneGraph: SceneGraph) {
-    // Update scene graph based on camera before rendering
-    camera.render(sceneGraph);
+  public render(sceneGraph: SceneGraph, camera?: Camera2D) {
+    camera?.render(sceneGraph);
+
     this.#renderer.render(sceneGraph.stage);
   }
 }
@@ -56,7 +56,13 @@ export class SceneGraph {
 
     this.#stage.addChild(this.#root);
 
-    this.#layers = [new PIXI.RenderLayer(), new PIXI.RenderLayer()];
+    this.#layers = [
+      new PIXI.RenderLayer(),
+      new PIXI.RenderLayer(),
+      new PIXI.RenderLayer(),
+      new PIXI.RenderLayer(),
+      new PIXI.RenderLayer(),
+    ];
     this.#root.addChild(...this.#layers);
   }
 
