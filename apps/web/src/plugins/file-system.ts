@@ -1,4 +1,4 @@
-import { FileSystemAdapter } from "@repo/engine";
+import { FileSystemAdapter } from "@atlas/core";
 
 import * as fs from "@tauri-apps/plugin-fs";
 
@@ -12,16 +12,19 @@ export class TauriFileSystemAdapter implements FileSystemAdapter {
       throw new Error(`Failed to parse JSON file: ${path}`, { cause: error });
     }
   }
-  
+
   async readFile(path: string): Promise<string> {
     return fs.readTextFile(path);
   }
-  
+
   async readFileBlob(path: string): Promise<Uint8Array<ArrayBuffer>> {
     return fs.readFile(path);
   }
-  
-  async writeFile(path: string, data: Uint8Array | ReadableStream<Uint8Array> | string): Promise<void> {
+
+  async writeFile(
+    path: string,
+    data: Uint8Array | ReadableStream<Uint8Array> | string
+  ): Promise<void> {
     if (typeof data === "string") {
       return fs.writeTextFile(path, data);
     }

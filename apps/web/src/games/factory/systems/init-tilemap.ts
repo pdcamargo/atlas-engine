@@ -1,4 +1,4 @@
-import { AssetServer, sys, TileMap } from "@repo/engine";
+import { AssetServer, sys, TileMap } from "@atlas/core";
 import { FactoryTileMap } from "../components/factory-tilemap";
 import { allTextures } from "../data/tiles";
 

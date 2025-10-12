@@ -1,4 +1,4 @@
-import { Input, KeyCode, QueryBuilder, sys, Velocity } from "@repo/engine";
+import { Input, KeyCode, QueryBuilder, sys, Velocity } from "@atlas/core";
 import { Character } from "../components/flags";
 
 const characterQuery = new QueryBuilder(Velocity, Character);

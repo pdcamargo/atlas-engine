@@ -1,4 +1,4 @@
-import { AnimatedSpriteAnimation, AssetServer } from "@repo/engine";
+import { AnimatedSpriteAnimation, AssetServer } from "@atlas/core";
 
 export const characterSprites = {
   idle: {

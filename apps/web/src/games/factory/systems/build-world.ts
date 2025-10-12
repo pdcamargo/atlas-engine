@@ -1,4 +1,4 @@
-import { Input, KeyCode, sys } from "@repo/engine";
+import { Input, KeyCode, sys } from "@atlas/core";
 import { GameState } from "../resources/game-state";
 import { BuildRequests } from "../resources/build-requests";
 import { TilesType, WorldGrid } from "../resources/world-grid";

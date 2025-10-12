@@ -4,7 +4,7 @@ import {
   DefaultPlugin,
   EcsPlugin,
   Physics2DPlugin,
-} from "@repo/engine";
+} from "@atlas/core";
 import { WorldGrid } from "./resources/world-grid";
 import { UserInteractionState } from "./resources/user-interaction";
 import { updateGridIndicator } from "./systems/update-grid-indicator";

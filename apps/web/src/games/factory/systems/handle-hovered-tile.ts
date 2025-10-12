@@ -1,4 +1,4 @@
-import { Camera2D, Input, sys, Viewport } from "@repo/engine";
+import { Camera2D, Input, sys, Viewport } from "@atlas/core";
 import { WorldGrid } from "../resources/world-grid";
 import { UserInteractionState } from "../resources/user-interaction";
 

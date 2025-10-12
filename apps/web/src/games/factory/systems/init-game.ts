@@ -11,7 +11,7 @@ import {
   Transform,
   Velocity,
   Viewport,
-} from "@repo/engine";
+} from "@atlas/core";
 import { Character, GridIndicator } from "../components/flags";
 import { getCharacterAnimations } from "../data/player-animation";
 

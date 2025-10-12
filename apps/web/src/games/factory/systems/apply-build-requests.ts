@@ -8,7 +8,7 @@ import {
   sys,
   Renderable,
   Collider2D,
-} from "@repo/engine";
+} from "@atlas/core";
 import { BuildRequests, FloorTileId } from "../resources/build-requests";
 import { WorldGrid } from "../resources/world-grid";
 import { FactoryTileMap } from "../components/factory-tilemap";

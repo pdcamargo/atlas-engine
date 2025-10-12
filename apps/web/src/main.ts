@@ -21,7 +21,7 @@ import {
   // Camera2D,
   // Viewport,
   DebugPlugin,
-} from "@repo/engine";
+} from "@atlas/core";
 
 // class GameState {
 //   hasBuiltWorld = false;

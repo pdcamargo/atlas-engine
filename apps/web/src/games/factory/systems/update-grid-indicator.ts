@@ -1,4 +1,4 @@
-import { sys } from "@repo/engine";
+import { sys } from "@atlas/core";
 import { UserInteractionState } from "../resources/user-interaction";
 import { assetIndicatorQuery } from "../queries/asset-indicator";
 import { WorldGrid } from "../resources/world-grid";
