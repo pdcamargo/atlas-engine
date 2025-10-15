@@ -8,6 +8,7 @@ import {
 } from "../..";
 
 export class FpsDisplay {}
+export class RootContainer {}
 
 function updateFps({ commands }: SystemFnArguments) {
   const fps = commands.getResource(Time).fps;
@@ -35,9 +36,13 @@ export class DebugPlugin implements EcsPlugin {
 
         const fps = new UiContainer(root);
 
+        fps.setBackgroundColor("black");
+        fps.setColor("white");
+
         fps.setTextContent("FPS: 0").setColor("white");
 
         commands.spawn(FpsDisplay, fps);
+        commands.spawn(RootContainer, root);
       })
       .addUpdateSystems(updateFps);
   }

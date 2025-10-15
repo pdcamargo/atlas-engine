@@ -15,7 +15,7 @@ import {
   unprocessedRigidBodies2DQuery,
 } from "./queries";
 import { Physics2DWorld, Physics2DWorldSettings } from "./resources";
-import { QueryBuilder, Renderer2D, SceneGraph } from "../../..";
+import { QueryBuilder } from "../../..";
 
 export const processColliders = sys(({ commands }) => {
   const world = commands.getResource(Physics2DWorld);
@@ -241,35 +241,5 @@ export const applyVelocities = sys(({ commands }) => {
   .label("apply-velocities")
   .afterLabel("process-rigid-bodies");
 
-import * as PIXI from "pixi.js";
-let lines: PIXI.Graphics | null = null;
-
-export const debugDraw = sys(({ commands }) => {
-  const world = commands.getResource(Physics2DWorld);
-  const sceneGraph = commands.getResource(SceneGraph);
-
-  const { vertices, colors } = world.debugRender();
-
-  const ppu = 100;
-
-  if (!lines) {
-    lines = new PIXI.Graphics();
-    sceneGraph.addChild(lines, 5);
-  }
-
-  lines.clear();
-
-  for (let i = 0; i < vertices.length / 4; i += 1) {
-    let color = rgb2hex([colors[i * 8], colors[i * 8 + 1], colors[i * 8 + 2]]);
-
-    lines.lineStyle(1.0, color, colors[i * 8 + 3]);
-    lines.moveTo(vertices[i * 4] * ppu, -vertices[i * 4 + 1] * ppu);
-    lines.lineTo(vertices[i * 4 + 2] * ppu, -vertices[i * 4 + 3] * ppu);
-  }
-})
-  .label("debug-draw")
-  .afterLabel("step-world");
-
-function rgb2hex(arg0: [number, number, number]) {
-  return new PIXI.Color({ r: arg0[0], g: arg0[1], b: arg0[2] });
-}
+// Debug drawing removed - PIXI dependency eliminated
+// If debug drawing is needed, it should be implemented using the new renderer-2d package

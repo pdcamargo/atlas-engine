@@ -1,4 +1,4 @@
-import { FileSystemAdapter } from "@atlas/core";
+import { FileSystemAdapter } from "@atlas/engine";
 
 import * as fs from "@tauri-apps/plugin-fs";
 

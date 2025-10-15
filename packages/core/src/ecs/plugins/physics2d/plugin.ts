@@ -12,7 +12,6 @@ import {
 } from "./resources";
 import {
   applyVelocities,
-  debugDraw,
   processColliders,
   processRigidBodies,
   stepWorld,
@@ -45,8 +44,7 @@ export class Physics2DPlugin implements EcsPlugin {
       .addSystems(
         SystemType.PostFixedUpdate,
         createSet(Physics2DWorldSet, syncRigidbodiesTransforms)
-      )
-      .addSystems(SystemType.Render, createSet(Physics2DWorldSet, debugDraw));
+      );
   }
 
   public ready(app: App) {

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --clearScreen false",
+    "dev": "vite --clearScreen false --host",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint \"src/**/*.ts\""
@@ -13,8 +13,7 @@
     "@tauri-apps/plugin-fs": "~2.4.2"
   },
   "devDependencies": {
-    "@atlas/core": "workspace:*",
-    "@atlas/renderer-2d": "workspace:*",
+    "@atlas/engine": "workspace:*",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@webgpu/types": "^0.1.64",

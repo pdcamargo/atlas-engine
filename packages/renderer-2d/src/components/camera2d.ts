@@ -1,6 +1,6 @@
 import { mat4 } from "gl-matrix";
-import { Color } from "../utils/color";
-import { Viewport } from "../utils/viewport";
+import { Color } from "@atlas/core";
+import type { Viewport } from "@atlas/core";
 
 /**
  * 2D Camera projection

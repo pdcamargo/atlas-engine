@@ -17,6 +17,8 @@ export * from "./ecs/plugins";
 export * from "./ecs/types";
 export * from "./ecs/components";
 export * from "./ecs/assets";
+export * from "./math";
+export * from "./object-pool";
 export { sys, createSet } from "./ecs/system_builder";
 export type { SystemBuilder } from "./ecs/system_builder";
 
@@ -128,11 +130,12 @@ export class App {
   }
 
   public async run() {
-    // kick off builds concurrently (do not await)
     this.#preparePlugins();
+
     await this.#finishPlugins();
     await this.#cleanupPlugins();
-    await this.#scheduler.run(ESystemType.StartUp, this);
+
+    this.#scheduler.run(ESystemType.StartUp, this);
 
     // Main loop wrapped in a Promise that resolves when no systems are stepping anymore
     await new Promise<void>((resolve) => {
@@ -141,7 +144,7 @@ export class App {
       let last = performance.now() / 1000;
       const running = this.#scheduler.hasTickSystems();
 
-      const step = async () => {
+      const step = () => {
         // If no tick systems remain, resolve and stop stepping
         if (!this.#scheduler.hasTickSystems()) {
           resolve();
@@ -153,20 +156,20 @@ export class App {
         last = now;
         accumulator += dt;
 
-        await this.#scheduler.run(ESystemType.PreUpdate, this);
-        await this.#scheduler.run(ESystemType.Update, this);
-        await this.#scheduler.run(ESystemType.PostUpdate, this);
+        this.#scheduler.run(ESystemType.PreUpdate, this);
+        this.#scheduler.run(ESystemType.Update, this);
+        this.#scheduler.run(ESystemType.PostUpdate, this);
 
         while (accumulator >= targetFixedDelta) {
-          await this.#scheduler.run(ESystemType.PreFixedUpdate, this);
-          await this.#scheduler.run(ESystemType.FixedUpdate, this);
-          await this.#scheduler.run(ESystemType.PostFixedUpdate, this);
+          this.#scheduler.run(ESystemType.PreFixedUpdate, this);
+          this.#scheduler.run(ESystemType.FixedUpdate, this);
+          this.#scheduler.run(ESystemType.PostFixedUpdate, this);
           accumulator -= targetFixedDelta;
         }
 
-        await this.#scheduler.run(ESystemType.PreRender, this);
-        await this.#scheduler.run(ESystemType.Render, this);
-        await this.#scheduler.run(ESystemType.PostRender, this);
+        this.#scheduler.run(ESystemType.PreRender, this);
+        this.#scheduler.run(ESystemType.Render, this);
+        this.#scheduler.run(ESystemType.PostRender, this);
 
         // Event maintenance and frame advancement
         this.#events.onFrameEnd();
@@ -175,12 +178,12 @@ export class App {
         if (!this.#scheduler.hasTickSystems()) {
           resolve();
         } else {
-          requestAnimationFrame(() => void step());
+          requestAnimationFrame(step);
         }
       };
 
       if (running) {
-        void step();
+        step();
       } else {
         resolve();
       }
@@ -259,7 +262,7 @@ export class App {
     // build can be sync or async; we await later in prepare
   }
 
-  #preparePlugins(): void {
+  async #preparePlugins(): Promise<void> {
     for (const p of this.#pluginInstances) {
       // fire and forget build; errors will surface in finish/ready if relevant
       void p.build(this);
@@ -284,12 +287,18 @@ export class App {
     const start = Date.now();
     while (finished.size < names.length) {
       let progressed = false;
+
       for (const n of names) {
         if (finished.has(n)) continue;
+
         const p = byName.get(n)!;
+
         const deps = getDeps(p);
         const depsReady = deps.every((dn) => finished.has(dn));
-        const ready = await (p.ready?.(this) ?? true);
+
+        const ready =
+          typeof p.ready === "function" ? await p.ready?.(this) : true;
+
         if (depsReady && ready) {
           await p.finish?.(this);
           finished.add(n);

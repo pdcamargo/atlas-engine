@@ -1,0 +1,25 @@
+{
+  "name": "@atlas/webgpu-renderer",
+  "version": "0.0.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint \"**/*.ts\""
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@repo/utils": "workspace:*",
+    "@webgpu/types": "^0.1.64",
+    "eslint": "^8.57.0",
+    "typescript": "5.5.4"
+  },
+  "dependencies": {
+    "@atlas/core": "workspace:*",
+    "gl-matrix": "4.0.0-beta.2",
+    "reflect-metadata": "^0.2.2",
+    "webgpu-utils": "^2.0.2"
+  }
+}

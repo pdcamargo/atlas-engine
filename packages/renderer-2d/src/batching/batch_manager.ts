@@ -86,8 +86,9 @@ export class BatchManager {
     entities: RenderEntity[]
   ): SpriteBatch {
     const instances = entities.map((e) => e.instanceData);
-    // For quad mesh: 6 indices per sprite (2 triangles)
-    const indexCount = entities.length * 6;
+    // For instanced rendering: indexCount is for a SINGLE quad (6 indices for 2 triangles)
+    // The GPU will draw this quad once per instance
+    const indexCount = 6;
 
     return new SpriteBatch(material, texture, instances, 0, indexCount);
   }

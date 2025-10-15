@@ -1,7 +1,49 @@
-import { Point, PointLike } from "pixi.js";
 import { mat4 } from "gl-matrix";
 
-export { Point };
+export class Point {
+  #x: number;
+  #y: number;
+  #onChanged?: () => void;
+
+  constructor(x: number = 0, y: number = 0, onChanged?: () => void) {
+    this.#x = x;
+    this.#y = y;
+    this.#onChanged = onChanged;
+  }
+
+  public get x(): number {
+    return this.#x;
+  }
+
+  public set x(value: number) {
+    if (this.#x !== value) {
+      this.#x = value;
+      this.#onChanged?.();
+    }
+  }
+
+  public get y(): number {
+    return this.#y;
+  }
+
+  public set y(value: number) {
+    if (this.#y !== value) {
+      this.#y = value;
+      this.#onChanged?.();
+    }
+  }
+
+  public copyFrom(point: PointLike | { x: number; y: number }): this {
+    this.x = point.x;
+    this.y = point.y;
+    return this;
+  }
+}
+
+export interface PointLike {
+  x: number;
+  y: number;
+}
 
 export class Transform {
   #position: Point;
@@ -16,9 +58,14 @@ export class Transform {
     rotation: number = 0,
     scale: { x: number; y: number } = { x: 1, y: 1 }
   ) {
-    this.#position = new Point(position.x, position.y);
+    // Create points with callback to mark transform as dirty when they change
+    this.#position = new Point(position.x, position.y, () => {
+      this.#isDirty = true;
+    });
     this.#rotation = rotation;
-    this.#scale = new Point(scale.x, scale.y);
+    this.#scale = new Point(scale.x, scale.y, () => {
+      this.#isDirty = true;
+    });
     this.#isDirty = true;
     this.#matrix = mat4.create();
     this.#updateMatrix();

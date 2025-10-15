@@ -1,8 +1,9 @@
 import { sys } from "@atlas/core";
-import { RenderDevice, RenderQueue } from "../render_device";
+import { RenderDevice } from "../render_device";
 import { RenderWorld } from "../render_world";
 import { Camera2D } from "../components/camera2d";
 import { UniformBuffer } from "../resources/uniform_buffer";
+import { BindGroupCache } from "../resources/bind_group_cache";
 import { MeshAllocator } from "../assets/mesh";
 import { TextureCache } from "../assets/texture";
 import { InstanceBuffer } from "../batching/instance_buffer";
@@ -30,6 +31,13 @@ export const renderSprites = sys(({ commands }) => {
   const textureBindGroupLayout = bindGroupLayouts?.textureBindGroupLayout;
   const batches = commands.tryGetResource<SpriteBatch[]>(Array);
 
+  // Get or create bind group cache
+  let bindGroupCache = commands.tryGetResource(BindGroupCache);
+  if (!bindGroupCache) {
+    bindGroupCache = new BindGroupCache();
+    commands.setResource(bindGroupCache);
+  }
+
   // Check if we have everything needed to render
   if (
     !pipeline ||
@@ -41,8 +49,15 @@ export const renderSprites = sys(({ commands }) => {
     batches.length === 0
   ) {
     // Nothing to render or not ready yet
+    console.log(
+      `🚫 Render skip: pipeline=${!!pipeline} batches=${batches?.length || 0} instanceBuffer=${!!instanceBuffer}`
+    );
     return;
   }
+
+  console.log(
+    `🎨 Rendering ${batches.length} batches with ${batches.reduce((sum, b) => sum + b.instances.length, 0)} instances`
+  );
 
   // Check if there's an active camera
   const cameras = renderWorld.world.query(Camera2D);
@@ -59,19 +74,12 @@ export const renderSprites = sys(({ commands }) => {
   const canvasTexture = context.getCurrentTexture();
   const view = canvasTexture.createView();
 
-  // Create camera bind group
-  const cameraBindGroup = device.createBindGroup({
-    label: "camera_bind_group",
-    layout: cameraBindGroupLayout,
-    entries: [
-      {
-        binding: 0,
-        resource: {
-          buffer: cameraUniform.buffer,
-        },
-      },
-    ],
-  });
+  // Get or create camera bind group (cached)
+  const cameraBindGroup = bindGroupCache.getCameraBindGroup(
+    device,
+    cameraBindGroupLayout,
+    cameraUniform.buffer
+  );
 
   // Get quad mesh
   const quadMesh = meshAllocator.getDefaultQuad(device);
@@ -115,39 +123,35 @@ export const renderSprites = sys(({ commands }) => {
   for (const batch of batches) {
     // Get texture for this batch
     let gpuTexture;
+    let textureKey = "default";
     if (batch.texture) {
-      const cacheKey = batch.texture.id.toString();
-      gpuTexture = textureCache.get(cacheKey);
+      textureKey = batch.texture.id.toString();
+      gpuTexture = textureCache.get(textureKey);
     }
 
     if (!gpuTexture) {
       // Use default white texture
       gpuTexture = textureCache.getDefaultWhiteTexture(device);
+      textureKey = "default";
     }
 
-    // Create texture bind group for this batch
-    const textureBindGroup = device.createBindGroup({
-      label: "texture_bind_group",
-      layout: textureBindGroupLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: gpuTexture.view,
-        },
-        {
-          binding: 1,
-          resource: gpuTexture.sampler,
-        },
-      ],
-    });
+    // Get or create texture bind group for this batch (cached)
+    const textureBindGroup = bindGroupCache.getTextureBindGroup(
+      device,
+      textureBindGroupLayout,
+      gpuTexture.view,
+      gpuTexture.sampler,
+      textureKey
+    );
 
     renderPass.setBindGroup(1, textureBindGroup);
 
     // Draw instances
     const instanceCount = batch.instances.length;
+
     if (quadMesh.indexBuffer && quadMesh.indexCount) {
       renderPass.drawIndexed(
-        quadMesh.indexCount,
+        batch.indexCount, // Use batch.indexCount (6 for one quad), not quadMesh.indexCount
         instanceCount,
         0,
         0,

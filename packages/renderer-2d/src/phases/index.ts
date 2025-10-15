@@ -1,4 +1,4 @@
-export { extractSprites, extractCameras } from "./extract";
+export { extractSprites, extractCameras, Extracted } from "./extract";
 export {
   prepareTextures,
   prepareMeshes,

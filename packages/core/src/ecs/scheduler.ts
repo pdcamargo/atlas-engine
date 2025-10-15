@@ -36,10 +36,7 @@ export class Scheduler {
     return this;
   }
 
-  public async run(
-    type: SystemType,
-    app: import("../index").App
-  ): Promise<void> {
+  public run(type: SystemType, app: import("../index").App): void {
     const ordered = this.#getOrderedSystems(type);
     for (const s of ordered) {
       // runIf gate (system-level and set-level, AND semantics)
@@ -68,7 +65,9 @@ export class Scheduler {
         } as const;
         let ok = true;
         for (const p of preds) {
-          if (!(await p(ctx))) {
+          // runIf predicates are now synchronous only
+          const result = p(ctx);
+          if (!result) {
             ok = false;
             break;
           }
@@ -77,14 +76,11 @@ export class Scheduler {
           continue;
         }
       }
-      await this.#invokeSystem(s, app);
+      this.#invokeSystem(s, app);
     }
   }
 
-  async #invokeSystem(
-    s: ScheduledSystem,
-    app: import("../index").App
-  ): Promise<void> {
+  #invokeSystem(s: ScheduledSystem, app: import("../index").App): void {
     const target = s.target ?? null;
     const fn = s.fn;
 
@@ -103,9 +99,9 @@ export class Scheduler {
     };
     const ctx = { commands, events: eventsApi } as const;
     if (target) {
-      await (fn as SystemFn).call(target, ctx);
+      (fn as SystemFn).call(target, ctx);
     } else {
-      await (fn as SystemFn)(ctx);
+      (fn as SystemFn)(ctx);
     }
   }
 

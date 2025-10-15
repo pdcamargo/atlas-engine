@@ -1,5 +1,3 @@
-import * as THREE from "three";
-
 import {
   App,
   EcsPlugin,
@@ -7,9 +5,7 @@ import {
   AssetServer,
   AssetLoader,
   Handle,
-  LoadState,
 } from "../..";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { Howl } from "howler";
 
@@ -17,7 +13,7 @@ import { Howl } from "howler";
  * 2D Texture asset (framework-agnostic)
  * Just holds raw image data that can be used by any renderer
  */
-export class Texture2D {
+export class ImageAsset {
   #image?: HTMLImageElement;
   #promise: Promise<HTMLImageElement>;
 
@@ -68,12 +64,12 @@ export class Texture2D {
 /**
  * Asset loader for 2D textures (PNG, JPG, etc.)
  */
-export class Texture2DLoader implements AssetLoader<Texture2D> {
+export class ImageLoader implements AssetLoader<ImageAsset> {
   extensions(): string[] {
     return ["png", "jpg", "jpeg", "webp", "gif", "bmp"];
   }
 
-  async load(bytes: Uint8Array, path: string): Promise<Texture2D> {
+  async load(bytes: Uint8Array, path: string): Promise<ImageAsset> {
     const blob = new Blob([bytes as any]);
     const url = URL.createObjectURL(blob);
 
@@ -95,7 +91,7 @@ export class Texture2DLoader implements AssetLoader<Texture2D> {
       img.src = url;
     });
 
-    return new Texture2D(imagePromise);
+    return new ImageAsset(imagePromise);
   }
 }
 
@@ -138,7 +134,7 @@ export class SoundLoader implements AssetLoader<Sound> {
     return ["mp3", "wav", "ogg", "webm", "m4a"];
   }
 
-  async load(bytes: Uint8Array, path: string): Promise<Sound> {
+  async load(bytes: Uint8Array, _path: string): Promise<Sound> {
     const blob = new Blob([bytes as any]);
     const url = URL.createObjectURL(blob);
 
@@ -159,54 +155,6 @@ export class SoundLoader implements AssetLoader<Sound> {
 }
 
 /**
- * 3D Model asset (GLTF/GLB)
- */
-export class Model3D {
-  #mesh: THREE.Mesh;
-
-  constructor(mesh: THREE.Mesh) {
-    this.#mesh = mesh;
-  }
-
-  public get mesh(): THREE.Mesh {
-    return this.#mesh;
-  }
-}
-
-/**
- * Asset loader for GLTF/GLB models
- */
-export class GLTFLoader2 implements AssetLoader<Model3D> {
-  #loader = new GLTFLoader();
-
-  extensions(): string[] {
-    return ["gltf", "glb"];
-  }
-
-  async load(bytes: Uint8Array, path: string): Promise<Model3D> {
-    const blob = new Blob([bytes as any]);
-    const url = URL.createObjectURL(blob);
-
-    return new Promise<Model3D>((resolve, reject) => {
-      this.#loader.load(
-        url,
-        (gltf) => {
-          URL.revokeObjectURL(url);
-          const mesh = new THREE.Mesh();
-          mesh.add(gltf.scene);
-          resolve(new Model3D(mesh));
-        },
-        undefined,
-        (error) => {
-          URL.revokeObjectURL(url);
-          reject(error);
-        }
-      );
-    });
-  }
-}
-
-/**
  * Plugin that sets up the asset system with default loaders
  */
 export class AssetsPlugin implements EcsPlugin {
@@ -214,35 +162,32 @@ export class AssetsPlugin implements EcsPlugin {
 
   public async build(app: App) {
     // Create asset storage for each type
-    const texture2DAssets = new Assets<Texture2D>();
+    const texture2DAssets = new Assets<ImageAsset>();
     const soundAssets = new Assets<Sound>();
-    const model3DAssets = new Assets<Model3D>();
 
     // Create asset server
     const assetServer = new AssetServer();
 
     // Register default loaders
-    assetServer.registerLoader(new Texture2DLoader());
+    assetServer.registerLoader(new ImageLoader());
     assetServer.registerLoader(new SoundLoader());
-    assetServer.registerLoader(new GLTFLoader2());
 
     // Register resources
     app.setResource(assetServer);
     app.setResource(texture2DAssets);
     app.setResource(soundAssets);
-    app.setResource(model3DAssets);
   }
 }
 
 /**
  * Helper function to load a texture and wait for it
  */
-export async function loadTexture2D(
+export async function loadImageAsset(
   assetServer: AssetServer,
-  assets: Assets<Texture2D>,
+  assets: Assets<ImageAsset>,
   path: string
-): Promise<Handle<Texture2D>> {
-  const handle = assetServer.load<Texture2D>(path);
+): Promise<Handle<ImageAsset>> {
+  const handle = assetServer.load<ImageAsset>(path);
   await assetServer.waitForLoad(handle);
   return handle;
 }

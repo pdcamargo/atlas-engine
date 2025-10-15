@@ -36,12 +36,24 @@ export class UiContainer {
     return this;
   }
 
+  public setInnerHTML(innerHTML: string) {
+    this.#element.innerHTML = innerHTML;
+
+    return this;
+  }
+
   public get textContent() {
     return this.#element.textContent;
   }
 
   public setColor(color: string) {
     this.#element.style.color = color;
+
+    return this;
+  }
+
+  public setBackgroundColor(color: string) {
+    this.#element.style.backgroundColor = color;
 
     return this;
   }

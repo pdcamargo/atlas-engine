@@ -1,4 +1,4 @@
-import { sys } from "@atlas/core";
+import { sys, Color } from "@atlas/engine";
 import { UserInteractionState } from "../resources/user-interaction";
 import { assetIndicatorQuery } from "../queries/asset-indicator";
 import { WorldGrid } from "../resources/world-grid";
@@ -12,10 +12,10 @@ export const updateGridIndicator = sys(({ commands }) => {
     return;
   }
 
-  const [, transform, sprite] = gridIndicator;
+  const [, transform, sprite, visibility] = gridIndicator;
 
   if (userInteraction.hoveredTile) {
-    sprite.get().visible = true;
+    visibility.visible = true;
 
     transform.setPosition({
       x: userInteraction.hoveredTile.x * grid.tileSize,
@@ -39,12 +39,12 @@ export const updateGridIndicator = sys(({ commands }) => {
     }
 
     if (hasCollision) {
-      sprite.get().tint = "red";
+      sprite.color = Color.RED;
     } else {
-      sprite.get().tint = "white";
+      sprite.color = Color.WHITE;
     }
   } else {
-    sprite.get().visible = false;
+    visibility.visible = false;
   }
 })
   .label("UpdateGridIndicator")

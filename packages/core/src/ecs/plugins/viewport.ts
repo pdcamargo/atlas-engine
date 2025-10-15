@@ -59,6 +59,12 @@ export class ViewportPlugin implements EcsPlugin {
               entry.contentRect.height
             )
           );
+
+        canvas.width = entry.contentRect.width * window.devicePixelRatio;
+        canvas.height = entry.contentRect.height * window.devicePixelRatio;
+
+        canvas.style.width = `${entry.contentRect.width}px`;
+        canvas.style.height = `${entry.contentRect.height}px`;
       }
     });
     resizeObserver.observe(container);

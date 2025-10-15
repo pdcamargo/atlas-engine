@@ -1,13 +1,18 @@
-import { sys, Assets, AssetServer, LoadState, Texture2D } from "@atlas/core";
+import {
+  sys,
+  AssetServer,
+  LoadState,
+  ImageAsset,
+  Transform,
+} from "@atlas/core";
 import { mat4 } from "gl-matrix";
 import { RenderDevice } from "../render_device";
 import { RenderWorld } from "../render_world";
 import { GpuTexture, TextureCache } from "../assets/texture";
-import { GpuMesh, MeshAllocator } from "../assets/mesh";
+import { MeshAllocator } from "../assets/mesh";
 import { UniformBuffer } from "../resources/uniform_buffer";
 import { Camera2D } from "../components/camera2d";
-import { Sprite } from "../components/sprite";
-import { GlobalTransform } from "../components/transform";
+import { Sprite2D } from "../components/sprite";
 
 /**
  * Resource to hold bind group layouts
@@ -21,6 +26,7 @@ export class BindGroupLayouts {
 
 /**
  * Prepare textures: convert Texture2D to GpuTexture
+ * Optimized to only process textures that aren't in cache yet
  */
 export const prepareTextures = sys(({ commands }) => {
   const device = commands.getResource(RenderDevice);
@@ -28,29 +34,58 @@ export const prepareTextures = sys(({ commands }) => {
   const renderWorld = commands.getResource(RenderWorld);
   const assetServer = commands.getResource(AssetServer);
 
-  // Get all sprites in render world
-  const sprites = Array.from(renderWorld.world.query(Sprite)).map(
-    (q) => q.components[0] as Sprite
+  // Get all unique textures from sprites in render world
+  const textureHandles = new Set<string>();
+  const sprites = renderWorld.world.query(Sprite2D);
+  const spriteList = Array.from(sprites);
+  console.log(
+    `🎨 Prepare: Found ${spriteList.length} sprites in render world for texture preparation`
   );
 
-  for (const sprite of sprites) {
-    if (!sprite.texture) continue;
+  for (const query of spriteList) {
+    const sprite = query.components[0] as Sprite2D;
+    if (sprite.texture) {
+      const cacheKey = sprite.texture.id.toString();
+      // Only process if not in cache (skip duplicate handles too)
+      if (!textureCache.has(cacheKey)) {
+        textureHandles.add(cacheKey);
+      }
+    }
+  }
 
-    const cacheKey = sprite.texture.id.toString();
+  // Early exit if no new textures to process
+  if (textureHandles.size === 0) {
+    return;
+  }
 
-    // Skip if already in cache
+  // Process only new textures
+  for (const cacheKey of textureHandles) {
+    // Re-check cache in case it was added by another sprite in this batch
     if (textureCache.has(cacheKey)) {
       continue;
     }
 
+    // Find the sprite with this texture to get the handle
+    let textureHandle;
+    const spritesQuery = renderWorld.world.query(Sprite2D);
+    for (const query of spritesQuery) {
+      const sprite = query.components[0] as Sprite2D;
+      if (sprite.texture && sprite.texture.id.toString() === cacheKey) {
+        textureHandle = sprite.texture;
+        break;
+      }
+    }
+
+    if (!textureHandle) continue;
+
     // Get the Texture2D asset from AssetServer
-    const texture2D = assetServer.getAsset<Texture2D>(sprite.texture);
+    const texture2D = assetServer.getAsset<ImageAsset>(textureHandle);
     if (!texture2D) {
       continue;
     }
 
     // Check if loaded
-    const loadState = assetServer.getLoadState(sprite.texture);
+    const loadState = assetServer.getLoadState(textureHandle);
 
     if (loadState !== LoadState.Loaded || !texture2D.isLoaded()) {
       continue;
@@ -111,19 +146,19 @@ export const prepareCameraUniforms = sys(({ commands }) => {
   }
 
   // Get the active camera
-  const cameras = Array.from(
-    renderWorld.world.query(Camera2D, GlobalTransform)
-  ).map((q) => ({
-    camera: q.components[0] as Camera2D,
-    transform: q.components[1] as GlobalTransform,
-  }));
+  const cameras = Array.from(renderWorld.world.query(Camera2D, Transform)).map(
+    (q) => ({
+      camera: q.components[0] as Camera2D,
+      transform: q.components[1] as Transform,
+    })
+  );
 
   if (cameras.length === 0) return;
 
   // Use first active camera
   const activeCamera =
     cameras.find(
-      (c: { camera: Camera2D; transform: GlobalTransform }) => c.camera.isActive
+      (c: { camera: Camera2D; transform: Transform }) => c.camera.isActive
     ) ?? cameras[0];
   if (!activeCamera) return;
 
@@ -133,8 +168,8 @@ export const prepareCameraUniforms = sys(({ commands }) => {
   // Create view matrix (translate by negative camera position)
   const view = mat4.create();
   mat4.translate(view, view, [
-    -activeCamera.transform.getPosition().x,
-    -activeCamera.transform.getPosition().y,
+    -activeCamera.transform.position.x,
+    -activeCamera.transform.position.y,
     0,
   ]);
 

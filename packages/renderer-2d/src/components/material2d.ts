@@ -1,5 +1,5 @@
 import type { Handle } from "@atlas/core";
-import { Color } from "../utils/color";
+import { Color } from "@atlas/core";
 
 /**
  * Reference to a material for 2D rendering
@@ -20,7 +20,7 @@ export class StandardMaterial2D {
   public baseTexture?: Handle<any>;
 
   constructor(options?: { baseColor?: Color; baseTexture?: Handle<any> }) {
-    this.baseColor = options?.baseColor ?? Color.WHITE;
+    this.baseColor = options?.baseColor ?? Color.white();
     this.baseTexture = options?.baseTexture;
   }
 

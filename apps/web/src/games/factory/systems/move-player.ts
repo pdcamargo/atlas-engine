@@ -1,4 +1,4 @@
-import { Input, KeyCode, QueryBuilder, sys, Velocity } from "@atlas/core";
+import { Input, KeyCode, QueryBuilder, sys, Velocity } from "@atlas/engine";
 import { Character } from "../components/flags";
 
 const characterQuery = new QueryBuilder(Velocity, Character);

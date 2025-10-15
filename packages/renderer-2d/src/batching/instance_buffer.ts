@@ -1,5 +1,5 @@
 import { RenderDevice } from "../render_device";
-import { Color } from "../utils";
+import { Color } from "@atlas/core";
 
 /**
  * Instance data for a single sprite

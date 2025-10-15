@@ -3,7 +3,7 @@ import { RenderDevice } from "../render_device";
 /**
  * Uniform buffer for GPU data
  */
-export class UniformBuffer<T> {
+export class UniformBuffer {
   public buffer: GPUBuffer;
   #device: RenderDevice;
   #size: number;
@@ -40,7 +40,7 @@ export class UniformBuffer<T> {
 /**
  * Dynamic uniform buffer for multiple uniform sets
  */
-export class DynamicUniformBuffer<T> {
+export class DynamicUniformBuffer {
   public buffer: GPUBuffer;
   #device: RenderDevice;
   #elementSize: number;
