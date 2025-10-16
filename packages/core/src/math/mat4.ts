@@ -581,14 +581,20 @@ export class Mat4 {
     return result;
   }
 
-  static multiply(a: Mat4 | Mat4Like, b: Mat4 | Mat4Like): Mat4 {
+  static multiply(a: Mat4 | Mat4Like, b: Mat4 | Mat4Like, out?: Mat4GL): Mat4 {
     const result = new Mat4();
     if (a instanceof Mat4 && b instanceof Mat4) {
       mat4.multiply(result._data, a._data, b._data);
+      if (out) {
+        mat4.set(out, ...result._data);
+      }
     } else {
       const aMat = a instanceof Mat4 ? a : Mat4.fromObject(a);
       const bMat = b instanceof Mat4 ? b : Mat4.fromObject(b);
       mat4.multiply(result._data, aMat._data, bMat._data);
+      if (out) {
+        mat4.set(out, ...result._data);
+      }
     }
     return result;
   }

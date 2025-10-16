@@ -1,4 +1,4 @@
-import { Mat4 } from "gl-matrix";
+import { Mat4, mat4 } from "gl-matrix";
 import { TileSet } from "./TileSet";
 import { Tile } from "./Tile";
 import { Color } from "@atlas/core";
@@ -26,6 +26,12 @@ export class TileMapBatch {
   // Bytes per tile instance: 16 floats (matrix) + 4 floats (frame) + 4 floats (tint) = 24 floats = 96 bytes
   private static readonly BYTES_PER_INSTANCE = 96;
   private static readonly FLOATS_PER_INSTANCE = 24;
+
+  // Reusable buffers to avoid GC pressure
+  private mvpMatrix: Mat4 = mat4.create();
+  private tileModelMatrix: Mat4 = mat4.create();
+  private translationVec: Float32Array = new Float32Array([0, 0, 0]);
+  private scaleVec: Float32Array = new Float32Array([1, 1, 1]);
 
   constructor(tileSet: TileSet) {
     this.tileSet = tileSet;
@@ -100,37 +106,36 @@ export class TileMapBatch {
     let offset = 0;
 
     for (const tileInstance of this.tiles) {
-      // Calculate tile world position
+      // Start with world matrix (copy using gl-matrix)
+      mat4.copy(this.tileModelMatrix, worldMatrix as Float32Array);
+
+      // Apply translation to tile position using gl-matrix
       const tileX = tileInstance.x * tileWidth;
       const tileY = tileInstance.y * tileHeight;
+      this.translationVec[0] = tileX;
+      this.translationVec[1] = tileY;
+      this.translationVec[2] = 0;
+      mat4.translate(
+        this.tileModelMatrix,
+        this.tileModelMatrix,
+        this.translationVec
+      );
 
-      // Create model matrix for this tile (apply world transform and tile position)
-      const tileModelMatrix = new Float32Array(16);
+      // Apply tile size scaling using gl-matrix
+      this.scaleVec[0] = tileWidth;
+      this.scaleVec[1] = tileHeight;
+      this.scaleVec[2] = 1;
+      mat4.scale(this.tileModelMatrix, this.tileModelMatrix, this.scaleVec);
 
-      // Start with world matrix
-      for (let i = 0; i < 16; i++) {
-        tileModelMatrix[i] = worldMatrix[i];
-      }
-
-      // Apply translation to tile position
-      tileModelMatrix[12] += tileX * worldMatrix[0] + tileY * worldMatrix[4];
-      tileModelMatrix[13] += tileX * worldMatrix[1] + tileY * worldMatrix[5];
-      tileModelMatrix[14] += tileX * worldMatrix[2] + tileY * worldMatrix[6];
-
-      // Apply tile size scaling
-      tileModelMatrix[0] *= tileWidth;
-      tileModelMatrix[1] *= tileWidth;
-      tileModelMatrix[2] *= tileWidth;
-      tileModelMatrix[4] *= tileHeight;
-      tileModelMatrix[5] *= tileHeight;
-      tileModelMatrix[6] *= tileHeight;
-
-      // Calculate MVP
-      const mvp = new Float32Array(16);
-      this.multiplyMatrices(mvp, vpMatrix, tileModelMatrix);
+      // Calculate MVP using gl-matrix (reusing buffer)
+      mat4.multiply(
+        this.mvpMatrix,
+        vpMatrix as Float32Array,
+        this.tileModelMatrix
+      );
 
       // Pack data: MVP (16) + frame (4) + tint (4)
-      this.instanceData.set(mvp, offset);
+      this.instanceData.set(this.mvpMatrix, offset);
       this.instanceData.set(tileInstance.tile.frame.data, offset + 16);
       this.instanceData.set(tileInstance.tint.data, offset + 20);
 
@@ -191,68 +196,5 @@ export class TileMapBatch {
       this.instanceBuffer.destroy();
       this.instanceBuffer = undefined;
     }
-  }
-
-  /**
-   * Helper: Multiply two 4x4 matrices
-   */
-  private multiplyMatrices(
-    out: Float32Array,
-    a: Float32Array | Mat4,
-    b: Float32Array
-  ): void {
-    const a00 = a[0],
-      a01 = a[1],
-      a02 = a[2],
-      a03 = a[3];
-    const a10 = a[4],
-      a11 = a[5],
-      a12 = a[6],
-      a13 = a[7];
-    const a20 = a[8],
-      a21 = a[9],
-      a22 = a[10],
-      a23 = a[11];
-    const a30 = a[12],
-      a31 = a[13],
-      a32 = a[14],
-      a33 = a[15];
-
-    const b00 = b[0],
-      b01 = b[1],
-      b02 = b[2],
-      b03 = b[3];
-    const b10 = b[4],
-      b11 = b[5],
-      b12 = b[6],
-      b13 = b[7];
-    const b20 = b[8],
-      b21 = b[9],
-      b22 = b[10],
-      b23 = b[11];
-    const b30 = b[12],
-      b31 = b[13],
-      b32 = b[14],
-      b33 = b[15];
-
-    out[0] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
-    out[1] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
-    out[2] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
-    out[3] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
-
-    out[4] = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
-    out[5] = a10 * b01 + a11 * b11 + a12 * b21 + a13 * b31;
-    out[6] = a10 * b02 + a11 * b12 + a12 * b22 + a13 * b32;
-    out[7] = a10 * b03 + a11 * b13 + a12 * b23 + a13 * b33;
-
-    out[8] = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
-    out[9] = a20 * b01 + a21 * b11 + a22 * b21 + a23 * b31;
-    out[10] = a20 * b02 + a21 * b12 + a22 * b22 + a23 * b32;
-    out[11] = a20 * b03 + a21 * b13 + a22 * b23 + a23 * b33;
-
-    out[12] = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;
-    out[13] = a30 * b01 + a31 * b11 + a32 * b21 + a33 * b31;
-    out[14] = a30 * b02 + a31 * b12 + a32 * b22 + a33 * b32;
-    out[15] = a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33;
   }
 }
