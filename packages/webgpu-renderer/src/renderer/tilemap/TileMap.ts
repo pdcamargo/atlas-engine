@@ -334,17 +334,43 @@ export class TileMap extends SceneNode {
   }
 
   /**
-   * Get chunks that are visible within the view bounds
+   * Get chunks that are visible within the view bounds, including adjacent chunks
+   * This provides a natural padding buffer to prevent tile popping
    */
   getVisibleChunks(viewBounds: ChunkBounds): TileMapChunk[] {
-    const visible: TileMapChunk[] = [];
+    const visibleChunkKeys = new Set<string>();
 
+    // First pass: find directly visible chunks
     for (const chunk of this.chunks.values()) {
       if (chunk.isInView(viewBounds)) {
-        visible.push(chunk);
+        const key = this.getChunkKey(chunk.chunkX, chunk.chunkY);
+        visibleChunkKeys.add(key);
       }
     }
 
-    return visible;
+    // Second pass: add adjacent chunks (8 neighbors)
+    const chunksToAdd = new Set<string>();
+    for (const chunkKey of visibleChunkKeys) {
+      const [chunkX, chunkY] = chunkKey.split(",").map(Number);
+
+      // Add all 8 neighbors
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const neighborKey = this.getChunkKey(chunkX + dx, chunkY + dy);
+          chunksToAdd.add(neighborKey);
+        }
+      }
+    }
+
+    // Collect all chunks (visible + adjacent)
+    const result: TileMapChunk[] = [];
+    for (const chunkKey of chunksToAdd) {
+      const chunk = this.chunks.get(chunkKey);
+      if (chunk) {
+        result.push(chunk);
+      }
+    }
+
+    return result;
   }
 }

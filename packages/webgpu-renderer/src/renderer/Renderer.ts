@@ -855,10 +855,10 @@ export class WebgpuRenderer {
       tileMap.markClean();
     }
 
-    // Get view bounds with padding to prevent tile popping
-    const viewBounds = this.getViewBoundsWithPadding(camera, 1.5);
+    // Get view bounds (no padding needed - adjacent chunks provide buffer)
+    const viewBounds = this.getViewBoundsWithPadding(camera, 1.0);
 
-    // Get visible chunks (fast AABB test)
+    // Get visible chunks + adjacent chunks (fast AABB test)
     const visibleChunks = tileMap.getVisibleChunks(viewBounds);
 
     // Get world matrix for rendering

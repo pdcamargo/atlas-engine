@@ -223,7 +223,7 @@ export class SlayGamePlugin implements EcsPlugin {
         const tilemap = new TileMap({
           tileWidth: 16,
           tileHeight: 16,
-          chunkSize: 30,
+          chunkSize: 15,
         });
 
         const tileSet = new TileSet(texture5, 16, 16);
