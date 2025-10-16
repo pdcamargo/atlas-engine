@@ -20,7 +20,7 @@ export class RenderBatch {
   private instanceCount: number = 0; // Track actual number of instances packed
 
   // Threshold for when to use instancing vs individual draws
-  private static readonly INSTANCING_THRESHOLD = 10;
+  private static readonly INSTANCING_THRESHOLD = 1;
 
   // Bytes per sprite instance: 16 floats (matrix) + 4 floats (frame) + 4 floats (tint) = 24 floats = 96 bytes
   private static readonly BYTES_PER_INSTANCE = 96;
@@ -93,7 +93,8 @@ export class RenderBatch {
    * Check if instancing should be used for this batch
    */
   shouldUseInstancing(): boolean {
-    return this.sprites.size >= RenderBatch.INSTANCING_THRESHOLD;
+    // return this.sprites.size >= RenderBatch.INSTANCING_THRESHOLD;
+    return true;
   }
 
   /**

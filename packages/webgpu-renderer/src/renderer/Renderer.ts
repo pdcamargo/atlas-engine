@@ -1,6 +1,6 @@
 import { Mat4, mat4 } from "gl-matrix";
 import { createBuffersAndAttributesFromArrays, primitives } from "webgpu-utils";
-import { Camera } from "./Camera";
+import { Camera, OrthographicCamera, PerspectiveCamera } from "./Camera";
 import { SceneGraph } from "./SceneGraph";
 import { Sprite } from "./Sprite";
 import { Square } from "./Primitive";
@@ -11,6 +11,8 @@ import spriteInstancedShaderCode from "./shaders/sprite_instanced.wgsl?raw";
 import primitiveShaderCode from "./shaders/primitive.wgsl?raw";
 import { ObjectPool } from "@atlas/core";
 import { RenderBatch } from "../batching";
+import { TileMap } from "./tilemap/TileMap";
+import { TileMapBatch } from "./tilemap/TileMapBatch";
 
 interface RendererOptions {
   canvas?: HTMLCanvasElement;
@@ -55,6 +57,11 @@ export class WebgpuRenderer {
   // Batch management for instanced rendering
   private batches = new Map<string, RenderBatch>(); // textureId -> RenderBatch
 
+  // TileMap batch management
+  private tileMapBatches = new Map<string, Map<string, TileMapBatch>>(); // tileMapId -> (tileSetId -> TileMapBatch)
+  private tileMapLastVPMatrix = new Map<string, Float32Array>(); // tileMapId -> last view-projection matrix
+  private tileMapLastWorldMatrix = new Map<string, Float32Array>(); // tileMapId -> last world matrix
+
   // Shared geometry buffers
   private quadBuffers: {
     buffers: GPUBuffer[];
@@ -68,6 +75,9 @@ export class WebgpuRenderer {
   private drawCallCount: number = 0;
   private renderedSpriteCount: number = 0;
   private batchCount: number = 0;
+  private totalTiles: number = 0;
+  private renderedTiles: number = 0;
+  private skippedTiles: number = 0;
 
   #initialized = false;
 
@@ -416,6 +426,9 @@ export class WebgpuRenderer {
     this.drawCallCount = 0;
     this.renderedSpriteCount = 0;
     this.batchCount = 0;
+    this.totalTiles = 0;
+    this.renderedTiles = 0;
+    this.skippedTiles = 0;
 
     // Update all transforms in the scene graph
     sceneGraph.updateTransforms();
@@ -441,6 +454,14 @@ export class WebgpuRenderer {
       ],
     });
 
+    sceneGraph.traverseVisible((node) => {
+      if (node instanceof TileMap) {
+        this.renderTileMap(renderPass, node, vpMatrix.data, camera);
+      } else if (node instanceof Square) {
+        this.renderSquare(renderPass, node, vpMatrix.data);
+      }
+    });
+
     // Render batches (sprites grouped by texture)
     for (const batch of this.batches.values()) {
       if (batch.isEmpty()) continue;
@@ -453,13 +474,6 @@ export class WebgpuRenderer {
         this.renderBatchIndividual(renderPass, batch, vpMatrix.data, camera);
       }
     }
-
-    // Render primitives (squares, etc.) - not batched
-    sceneGraph.traverseVisible((node) => {
-      if (node instanceof Square) {
-        this.renderSquare(renderPass, node, vpMatrix.data);
-      }
-    });
 
     renderPass.end();
     this.device.queue.submit([commandEncoder.finish()]);
@@ -723,6 +737,9 @@ export class WebgpuRenderer {
       renderedSprites: this.renderedSpriteCount,
       batches: this.batchCount,
       totalBatches: this.batches.size,
+      totalTiles: this.totalTiles,
+      renderedTiles: this.renderedTiles,
+      skippedTiles: this.skippedTiles,
     };
   }
 
@@ -745,5 +762,276 @@ export class WebgpuRenderer {
    */
   getBatchCount(): number {
     return this.batchCount;
+  }
+
+  /**
+   * Compare two matrices for equality
+   */
+  private matricesEqual(a: Float32Array, b: Float32Array): boolean {
+    for (let i = 0; i < 16; i++) {
+      if (Math.abs(a[i] - b[i]) > 0.0001) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Get view bounds with padding to prevent tile popping
+   * @param camera - The camera to get bounds from
+   * @param paddingMultiplier - Multiplier for padding (1.5 = 50% extra on each side)
+   */
+  private getViewBoundsWithPadding(
+    camera: Camera,
+    paddingMultiplier: number = 1.5
+  ): { left: number; right: number; top: number; bottom: number } {
+    // For orthographic cameras, we can directly use the camera bounds
+    if (camera instanceof OrthographicCamera) {
+      const width = camera.right - camera.left;
+      const height = camera.top - camera.bottom;
+      const padWidth = (width * (paddingMultiplier - 1)) / 2;
+      const padHeight = (height * (paddingMultiplier - 1)) / 2;
+
+      return {
+        left: camera.target.x + camera.left - padWidth,
+        right: camera.target.x + camera.right + padWidth,
+        bottom: camera.target.y + camera.bottom - padHeight,
+        top: camera.target.y + camera.top + padHeight,
+      };
+    }
+
+    // For perspective cameras, estimate frustum at target distance
+    if (camera instanceof PerspectiveCamera) {
+      const distance = Math.sqrt(
+        Math.pow(camera.target.x - camera.position.x, 2) +
+          Math.pow(camera.target.y - camera.position.y, 2) +
+          Math.pow(camera.target.z - camera.position.z, 2)
+      );
+
+      const halfFovTan = Math.tan(camera.fov / 2);
+      const frustumHeight = 2 * halfFovTan * distance * paddingMultiplier;
+      const frustumWidth = frustumHeight * camera.getAspectRatio();
+
+      return {
+        left: camera.target.x - frustumWidth / 2,
+        right: camera.target.x + frustumWidth / 2,
+        bottom: camera.target.y - frustumHeight / 2,
+        top: camera.target.y + frustumHeight / 2,
+      };
+    }
+
+    // Fallback: very large bounds (no culling)
+    return {
+      left: -Infinity,
+      right: Infinity,
+      bottom: -Infinity,
+      top: Infinity,
+    };
+  }
+
+  /**
+   * Render a tilemap
+   */
+  private renderTileMap(
+    renderPass: GPURenderPassEncoder,
+    tileMap: TileMap,
+    vpMatrix: Mat4,
+    camera: Camera
+  ): void {
+    if (!this.spriteInstancedBindGroupLayout) {
+      throw new Error("Instanced pipeline not initialized");
+    }
+
+    // Get or create batch map for this tilemap
+    let batchMap = this.tileMapBatches.get(tileMap.id);
+    const needsFullRebuild = tileMap.isDirty() || !batchMap;
+
+    if (needsFullRebuild) {
+      // Clear old batches if they exist
+      if (batchMap) {
+        for (const batch of batchMap.values()) {
+          batch.destroy();
+        }
+      }
+
+      // Create new batch map
+      batchMap = new Map<string, TileMapBatch>();
+      this.tileMapBatches.set(tileMap.id, batchMap);
+
+      // Calculate view bounds with padding to prevent popping
+      const viewBounds = this.getViewBoundsWithPadding(camera, 1.5);
+
+      // Get tilemap world transform to convert tile coordinates to world space
+      const worldMatrix = tileMap.getWorldMatrix();
+      const tileMapWorldX = worldMatrix[12];
+      const tileMapWorldY = worldMatrix[13];
+      // Extract scale from world matrix (assuming uniform scale in X and Y)
+      const scaleX = Math.sqrt(
+        worldMatrix[0] * worldMatrix[0] + worldMatrix[1] * worldMatrix[1]
+      );
+      const scaleY = Math.sqrt(
+        worldMatrix[4] * worldMatrix[4] + worldMatrix[5] * worldMatrix[5]
+      );
+
+      // Build batches by grouping tiles by tileset
+      const layers = tileMap.getLayers();
+
+      for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+        const layer = layers[layerIndex];
+        if (!layer.visible) continue;
+
+        const allTiles = layer.getAllTiles();
+
+        for (const { x, y, data } of allTiles) {
+          // Calculate tile world position (apply scale)
+          const tileWorldX = tileMapWorldX + x * tileMap.tileWidth * scaleX;
+          const tileWorldY = tileMapWorldY + y * tileMap.tileHeight * scaleY;
+          const tileWorldWidth = tileMap.tileWidth * scaleX;
+          const tileWorldHeight = tileMap.tileHeight * scaleY;
+
+          // Frustum culling: skip tiles outside view bounds
+          if (
+            tileWorldX + tileWorldWidth < viewBounds.left ||
+            tileWorldX > viewBounds.right ||
+            tileWorldY + tileWorldHeight < viewBounds.bottom ||
+            tileWorldY > viewBounds.top
+          ) {
+            continue; // Skip this tile - it's outside the view
+          }
+
+          const tileSetId = data.tileSet.id;
+
+          // Get or create batch for this tileset
+          let batch = batchMap.get(tileSetId);
+          if (!batch) {
+            batch = new TileMapBatch(data.tileSet);
+            batch.initialize(this.device);
+            batchMap.set(tileSetId, batch);
+          }
+
+          // Calculate final tint (layer tint * tile tint)
+          const finalTint = data.tint ? data.tint.clone() : layer.tint.clone();
+          if (data.tint && !data.tint.equals(layer.tint)) {
+            finalTint.multiplyColor(layer.tint);
+          }
+
+          // Add tile to batch
+          batch.addTile(x, y, data.tile, layerIndex, finalTint);
+        }
+      }
+
+      tileMap.markClean();
+    }
+
+    // Check if camera or tilemap has moved since last frame
+    const worldMatrix = tileMap.getWorldMatrix();
+    const lastVP = this.tileMapLastVPMatrix.get(tileMap.id);
+    const lastWorld = this.tileMapLastWorldMatrix.get(tileMap.id);
+
+    let needsTransformUpdate = false;
+
+    // Check if VP matrix changed (vpMatrix is Mat4)
+    if (!lastVP || !this.matricesEqual(lastVP, vpMatrix as Float32Array)) {
+      needsTransformUpdate = true;
+      // Cache the new VP matrix
+      this.tileMapLastVPMatrix.set(
+        tileMap.id,
+        new Float32Array(vpMatrix as Float32Array)
+      );
+    }
+
+    // Check if world matrix changed (worldMatrix is already Float32Array from getWorldMatrix)
+    if (!lastWorld || !this.matricesEqual(lastWorld, worldMatrix)) {
+      needsTransformUpdate = true;
+      // Cache the new world matrix
+      this.tileMapLastWorldMatrix.set(
+        tileMap.id,
+        new Float32Array(worldMatrix)
+      );
+    }
+
+    // Only rebuild batch transforms when camera or tilemap actually moved
+    if (needsTransformUpdate && batchMap) {
+      for (const batch of batchMap.values()) {
+        batch.rebuild(
+          vpMatrix,
+          worldMatrix,
+          tileMap.tileWidth,
+          tileMap.tileHeight
+        );
+      }
+    }
+
+    // Count total tiles in tilemap (do this every frame)
+    const layers = tileMap.getLayers();
+    for (const layer of layers) {
+      if (layer.visible) {
+        this.totalTiles += layer.getTileCount();
+      }
+    }
+
+    // Render all batches
+    if (batchMap) {
+      for (const batch of batchMap.values()) {
+        if (batch.isEmpty()) continue;
+
+        const instanceDataInfo = batch.getInstanceData();
+        if (instanceDataInfo.count === 0) continue;
+
+        // Count rendered tiles from batch
+        this.renderedTiles += instanceDataInfo.count;
+
+        // Get or create instance buffer
+        const instanceBuffer = batch.getOrCreateInstanceBuffer();
+
+        // Write instance data to GPU
+        this.device.queue.writeBuffer(
+          instanceBuffer,
+          0,
+          instanceDataInfo.data.buffer,
+          0,
+          instanceDataInfo.count * 96 // 96 bytes per instance
+        );
+
+        // Create bind group
+        const bindGroup = this.device.createBindGroup({
+          layout: this.spriteInstancedBindGroupLayout,
+          entries: [
+            { binding: 0, resource: { buffer: instanceBuffer } },
+            { binding: 1, resource: batch.tileSet.texture.sampler },
+            {
+              binding: 2,
+              resource: this.getOrCreateTextureView(batch.tileSet.texture),
+            },
+          ],
+        });
+
+        // Draw instanced
+        renderPass.setPipeline(this.spriteInstancedPipeline);
+        renderPass.setBindGroup(0, bindGroup);
+        for (let i = 0; i < this.quadBuffers.bufferLayouts.length; i++) {
+          renderPass.setVertexBuffer(i, this.quadBuffers.buffers[i]);
+        }
+        if (this.quadBuffers.indexBuffer) {
+          renderPass.setIndexBuffer(
+            this.quadBuffers.indexBuffer,
+            this.quadBuffers.indexFormat!
+          );
+          renderPass.drawIndexed(
+            this.quadBuffers.numElements,
+            instanceDataInfo.count
+          );
+        } else {
+          renderPass.draw(this.quadBuffers.numElements, instanceDataInfo.count);
+        }
+
+        // Track stats
+        this.drawCallCount++;
+        this.batchCount++;
+      }
+    }
+
+    // Calculate skipped tiles
+    this.skippedTiles = this.totalTiles - this.renderedTiles;
   }
 }

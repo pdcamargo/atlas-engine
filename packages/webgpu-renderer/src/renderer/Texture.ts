@@ -11,12 +11,16 @@ export class Texture {
   public id: string;
   public gpuTexture: GPUTexture;
   public sampler: GPUSampler;
+  public width: number;
+  public height: number;
 
   private constructor(texture: GPUTexture, sampler: GPUSampler, id?: string) {
     this.id = id ?? uuidv4();
 
     this.gpuTexture = texture;
     this.sampler = sampler;
+    this.width = texture.width;
+    this.height = texture.height;
   }
 
   /**

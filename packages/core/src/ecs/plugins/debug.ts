@@ -41,8 +41,8 @@ export class DebugPlugin implements EcsPlugin {
 
         fps.setTextContent("FPS: 0").setColor("white");
 
-        commands.spawn(FpsDisplay, fps);
-        commands.spawn(RootContainer, root);
+        commands.spawn(new FpsDisplay(), fps);
+        commands.spawn(new RootContainer(), root);
       })
       .addUpdateSystems(updateFps);
   }

@@ -13,11 +13,21 @@ import {
   Color,
   OrthographicCamera,
   Rect,
-  RootContainer,
   FlexContainer,
   UiContainer,
   QueryBuilder,
   WebgpuRenderer,
+  TileMap,
+  TileSet,
+  Button,
+  RootContainer,
+  AudioClip,
+  AudioSource,
+  AudioListener,
+  MainCamera,
+  Input,
+  KeyCode,
+  Time,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
@@ -33,6 +43,7 @@ class Flag {
 class Flag2 extends Flag {}
 class Flag3 extends Flag {}
 class Flag4 extends Flag {}
+class Flag5 extends Flag {}
 
 class Handled {}
 
@@ -65,13 +76,39 @@ export class SlayGamePlugin implements EcsPlugin {
           "/sprites/character/sprites/RUN/run_right.png"
         );
 
+        const tilemapHandle = assetServer.load<ImageAsset>(
+          "/sprites/Assets.png"
+        );
+
         commands.spawn(new Flag(textureHandle));
         commands.spawn(new Flag2(textureHandle2));
         commands.spawn(new Flag3(textureHandle3));
         commands.spawn(new Flag4(textureHandle4));
+
+        commands.spawn(new Flag5(tilemapHandle));
+
+        // Load audio clip
+        const clipHandle = assetServer.load<AudioClip>("/level-up.mp3");
+
+        // Spawn entity with AudioSource component
+        commands.spawn(
+          new AudioSource({
+            clip: clipHandle,
+            bus: "master",
+            playing: false,
+            loop: false,
+            volume: 1.0,
+            position: undefined,
+            spatialBlend: 0, // 0 = no spatialization, 1 = full spatial
+          })
+        );
+
+        commands.spawn(new AudioListener());
       })
       .addUpdateSystems(({ commands }) => {
-        const rootContainer = commands.query(FlexContainer).tryFind();
+        const rootContainer = commands
+          .query(FlexContainer, RootContainer)
+          .tryFind();
         const txtC = commands
           .query(new QueryBuilder(UiContainer, RendererDebug))
           .tryFind();
@@ -82,14 +119,35 @@ export class SlayGamePlugin implements EcsPlugin {
           txt.setColor("white");
           txt.setBackgroundColor("black");
           commands.spawn(txt, new RendererDebug());
-          console.log("spawned renderer debug");
+
+          const button = new Button(rootContainer[1]);
+          button.setTextContent("Debug");
+          button.setColor("white");
+          button.setBackgroundColor("black");
+          commands.spawn(button);
+
+          button.element.onclick = () => {
+            app.world.debug();
+          };
         } else if (txtC) {
           const stats = commands.getResource(WebgpuRenderer).getStats();
           txtC[1].setInnerHTML(`
             <div>Draw calls: ${stats.drawCalls}</div>
             <div>Rendered sprites: ${stats.renderedSprites}</div>
-            <div>Batches: ${stats.batches / stats.totalBatches}</div>
-            <div>Total batches: ${stats.totalBatches}</div>
+            <div>Batches: ${stats.batches} / ${stats.totalBatches}</div>
+            <div>Total tiles: ${stats.totalTiles}</div>
+            <div>Rendered tiles: ${stats.renderedTiles}</div>
+            <div>Skipped tiles: ${stats.skippedTiles}</div>
+            <div>Culling efficiency: ${stats.totalTiles > 0 ? ((stats.skippedTiles / stats.totalTiles) * 100).toFixed(1) : 0}%</div>
+            <div>Memory usage: ${Math.round(
+              (
+                performance as unknown as {
+                  memory: { usedJSHeapSize: number };
+                }
+              ).memory.usedJSHeapSize /
+                1024 /
+                1024
+            )} MB</div>
           `);
         }
 
@@ -101,6 +159,7 @@ export class SlayGamePlugin implements EcsPlugin {
         const [, flag2] = commands.query(Flag2).find();
         const [, flag3] = commands.query(Flag3).find();
         const [, flag4] = commands.query(Flag4).find();
+        const [, flag5] = commands.query(Flag5).find();
         const assetServer = commands.getResource(AssetServer);
 
         if (assetServer.getLoadState(flag.handle) !== LoadState.Loaded) {
@@ -119,11 +178,22 @@ export class SlayGamePlugin implements EcsPlugin {
           return;
         }
 
+        if (assetServer.getLoadState(flag5.handle) !== LoadState.Loaded) {
+          return;
+        }
+
         const imageAsset = assetServer.getAsset(flag.handle)!;
         const imageAsset2 = assetServer.getAsset(flag2.handle)!;
         const imageAsset3 = assetServer.getAsset(flag3.handle)!;
         const imageAsset4 = assetServer.getAsset(flag4.handle)!;
+        const imageAsset5 = assetServer.getAsset(flag5.handle)!;
+
         const device = commands.getResource(GpuRenderDevice).get();
+
+        const texture5 = Texture.fromSource(device, imageAsset5.image!, {
+          minFilter: "nearest",
+          magFilter: "nearest",
+        });
 
         const texture = Texture.fromSource(device, imageAsset.image!, {
           minFilter: "nearest",
@@ -150,7 +220,33 @@ export class SlayGamePlugin implements EcsPlugin {
         const frames = 8;
         const frameWidth = 1 / frames;
 
-        for (let i = 0; i < 2050; i++) {
+        const tilemap = new TileMap({ tileWidth: 16, tileHeight: 16 });
+
+        const tileSet = new TileSet(texture5, 16, 16);
+        tileSet.addTilesFromGrid(12, 21);
+
+        tilemap.setScale({ x: 0.005, y: 0.005 });
+        tilemap.setPosition({ x: -5, y: 5 });
+
+        const layer = tilemap.addLayer("default");
+        const layer2 = tilemap.addLayer("default2");
+        const layer3 = tilemap.addLayer("default3");
+
+        for (let i = 0; i < 1024; i++) {
+          for (let j = 0; j < 1024; j++) {
+            layer.setTile(i, -j, tileSet, tileSet.getTile(0)!);
+            layer2.setTile(i, -j, tileSet, tileSet.getTile(207)!);
+            layer3.setTile(i, -j, tileSet, tileSet.getTile(111)!);
+          }
+        }
+
+        sceneGraph.addRoot(tilemap);
+        commands.spawn(tilemap);
+        // layer.setTile(1, 0, tileSet, tileSet.getTile(1)!);
+        // layer.setTile(2, 0, tileSet, tileSet.getTile(2)!);
+        // layer.setTile(3, 0, tileSet, tileSet.getTile(3)!);
+
+        for (let i = 0; i < 10; i++) {
           const sprite = new Sprite(texture);
           sprite.setSize(0.5, 0.5);
           sprite.setTint(
@@ -219,12 +315,13 @@ export class SlayGamePlugin implements EcsPlugin {
 
         const camera = new OrthographicCamera(-1, 1, -1, 1, 0.1, 100);
         camera.position.set(0, 0, 5);
+        camera.target.set(0, 0, 0); // Move target to same X,Y so camera looks straight down
         camera.markViewDirty();
 
         // const square = new Square(1, Color.red());
         // sceneGraph.addRoot(square);
 
-        commands.spawn(camera);
+        commands.spawn(camera, new MainCamera());
         commands.spawn(sceneGraph);
 
         commands.spawn(new Handled());
@@ -242,6 +339,38 @@ export class SlayGamePlugin implements EcsPlugin {
             x: Math.random() * Math.random() - 0.5,
             y: Math.random() * Math.random() - 0.5,
           });
+        }
+
+        const [, camera] = commands
+          .query(OrthographicCamera, MainCamera)
+          .find();
+
+        const cameraSpeed = 5;
+        const time = commands.getResource(Time);
+
+        const cameraMove = cameraSpeed * time.deltaTime;
+
+        const input = commands.getResource(Input);
+        if (input.pressed(KeyCode.ArrowUp)) {
+          camera.position.y += cameraMove;
+          camera.target.y += cameraMove;
+
+          camera.markViewDirty();
+        }
+        if (input.pressed(KeyCode.ArrowDown)) {
+          camera.position.y -= cameraMove;
+          camera.target.y -= cameraMove;
+          camera.markViewDirty();
+        }
+        if (input.pressed(KeyCode.ArrowLeft)) {
+          camera.position.x -= cameraMove;
+          camera.target.x -= cameraMove;
+          camera.markViewDirty();
+        }
+        if (input.pressed(KeyCode.ArrowRight)) {
+          camera.position.x += cameraMove;
+          camera.target.x += cameraMove;
+          camera.markViewDirty();
         }
       });
   }

@@ -8,6 +8,8 @@ A high-performance WebGPU-based 2D rendering engine with scene graph support, bu
 - **Camera Support**: Perspective and Orthographic cameras with customizable parameters
 - **Primitives**: Square and Circle primitives with solid colors
 - **Sprites**: Textured quad rendering with automatic mipmap generation
+- **Tilemaps**: High-performance tilemap rendering with multi-tileset and multi-layer support
+- **Instanced Rendering**: Automatic batching and instancing for optimal performance
 - **ECS-Friendly**: Stateless renderer designed for future ECS integration
 - **WebGPU-Powered**: Modern graphics API for high performance
 - **Math Library**: Uses gl-matrix for all matrix/vector operations
@@ -65,6 +67,225 @@ async function main() {
 }
 
 main();
+```
+
+## Tilemaps
+
+The WebGPU renderer includes a high-performance tilemap system with support for multiple tilesets, layers, and runtime editing. Tilemaps use instanced rendering for excellent performance even with thousands of tiles.
+
+### Quick Example
+
+```typescript
+import {
+  WebgpuRenderer,
+  SceneGraph,
+  OrthographicCamera,
+  TileMap,
+  TileSet,
+  Texture,
+} from "@webgpu-renderer";
+
+// Initialize renderer
+const renderer = new WebgpuRenderer();
+await renderer.initialize();
+
+const sceneGraph = new SceneGraph();
+
+// Create tilemap (16x16 pixel tiles)
+const tileMap = new TileMap({ tileWidth: 16, tileHeight: 16 });
+sceneGraph.addChild(tileMap);
+
+// Load texture and create tileset
+const texture = await Texture.fromURL(renderer.gpu.device, "tileset.png");
+const tileSet = new TileSet(texture, 16, 16);
+
+// Auto-generate tiles from an 8x8 grid (64 tiles total)
+tileSet.addTilesFromGrid(8, 8);
+
+// Create layers
+const groundLayer = tileMap.addLayer("ground");
+const decorationLayer = tileMap.addLayer("decorations");
+
+// Set tiles
+groundLayer.setTile(0, 0, tileSet, tileSet.getTile(0)!);
+groundLayer.setTile(1, 0, tileSet, tileSet.getTile(1)!);
+groundLayer.setTile(0, 1, tileSet, tileSet.getTile(8)!);
+
+decorationLayer.setTile(0, 0, tileSet, tileSet.getTile(32)!);
+
+// Render loop
+function animate() {
+  renderer.render(camera, sceneGraph);
+  requestAnimationFrame(animate);
+}
+animate();
+```
+
+### Creating a TileSet
+
+A `TileSet` manages a texture and defines which regions represent tiles:
+
+```typescript
+// Create tileset from texture
+const tileSet = new TileSet(texture, tileWidth, tileHeight, {
+  spacing: 1, // Optional: spacing between tiles in pixels
+  margin: 0, // Optional: margin around the tileset in pixels
+});
+
+// Auto-generate tiles from a grid (most common approach)
+tileSet.addTilesFromGrid(columns, rows, startId);
+
+// Or manually define tiles
+tileSet.addTileFromPixels(id, x, y, width, height);
+
+// Get a tile by ID
+const tile = tileSet.getTile(5);
+```
+
+### Managing Layers
+
+Layers allow you to organize tiles into different rendering groups:
+
+```typescript
+// Add layers
+const ground = tileMap.addLayer("ground", 0); // zIndex: 0
+const decoration = tileMap.addLayer("decorations", 10); // zIndex: 10
+const foreground = tileMap.addLayer("foreground", 20); // zIndex: 20
+
+// Get a layer
+const layer = tileMap.getLayer("ground");
+
+// Get or create a layer
+const layer = tileMap.ensureLayer("ground");
+
+// Set layer properties
+layer.visible = true;
+layer.setTint(Color.white());
+layer.zIndex = 5;
+
+// Remove a layer
+tileMap.removeLayer("decorations");
+```
+
+### Setting Tiles
+
+```typescript
+// Set a tile in a layer
+layer.setTile(x, y, tileSet, tile);
+
+// Or use the tilemap convenience method
+tileMap.setTile(x, y, "ground", tileSet, tile);
+
+// Set a tile with custom tint
+const tint = new Color(1, 0.5, 0.5, 1); // Reddish tint
+layer.setTile(x, y, tileSet, tile, tint);
+
+// Remove a tile
+layer.removeTile(x, y);
+
+// Check if a tile exists
+if (layer.hasTile(x, y)) {
+  const tileData = layer.getTile(x, y);
+}
+
+// Clear entire layer
+layer.clear();
+```
+
+### Runtime Editing
+
+Tilemaps use a dirty flag system for efficient runtime updates:
+
+```typescript
+// Modify tiles at runtime
+groundLayer.setTile(10, 10, tileSet, tileSet.getTile(5)!); // Marks tilemap as dirty
+groundLayer.removeTile(5, 5); // Marks tilemap as dirty
+
+// The next render() call will automatically rebuild batches
+renderer.render(camera, sceneGraph);
+```
+
+### Multiple Tilesets
+
+You can mix different tilesets in the same tilemap:
+
+```typescript
+const groundTileSet = new TileSet(groundTexture, 16, 16);
+groundTileSet.addTilesFromGrid(8, 8);
+
+const decorTileSet = new TileSet(decorTexture, 16, 16);
+decorTileSet.addTilesFromGrid(4, 4);
+
+// Use different tilesets in the same layer
+groundLayer.setTile(0, 0, groundTileSet, groundTileSet.getTile(0)!);
+groundLayer.setTile(1, 0, decorTileSet, decorTileSet.getTile(5)!);
+
+// The renderer automatically batches by tileset for optimal performance
+```
+
+### Performance
+
+The tilemap system is designed for high performance:
+
+- **Instanced Rendering**: All tiles using the same tileset are rendered in a single draw call
+- **Dirty Flags**: Instance buffers are only rebuilt when tiles change
+- **Sparse Storage**: Only tiles that exist are stored in memory
+- **Automatic Batching**: Tiles are grouped by tileset across all layers
+- **GPU Buffers**: Instance data is reused and grown as needed
+
+A tilemap with 10,000 tiles using 3 different tilesets will result in only 3 draw calls!
+
+### API Summary
+
+**TileMap**
+
+```typescript
+class TileMap extends SceneNode {
+  constructor(options: { tileWidth: number; tileHeight: number });
+  addLayer(name: string, zIndex?: number): TileMapLayer;
+  getLayer(name: string): TileMapLayer | undefined;
+  ensureLayer(name: string, zIndex?: number): TileMapLayer;
+  removeLayer(name: string): boolean;
+  setTile(x, y, layerName, tileSet, tile, tint?): void;
+  removeTile(x, y, layerName): boolean;
+  clear(): void;
+}
+```
+
+**TileSet**
+
+```typescript
+class TileSet {
+  constructor(
+    texture: Texture,
+    tileWidth: number,
+    tileHeight: number,
+    options?
+  );
+  addTile(id, frame, metadata?): Tile;
+  addTileFromPixels(id, x, y, width, height, metadata?): Tile;
+  addTilesFromGrid(columns, rows, startId?): Tile[];
+  getTile(id): Tile | undefined;
+  hasTile(id): boolean;
+}
+```
+
+**TileMapLayer**
+
+```typescript
+class TileMapLayer {
+  name: string;
+  visible: boolean;
+  tint: Color;
+  zIndex: number;
+
+  setTile(x, y, tileSet, tile, tint?): void;
+  removeTile(x, y): boolean;
+  getTile(x, y): TileData | undefined;
+  hasTile(x, y): boolean;
+  clear(): void;
+  getBounds(): LayerBounds | null;
+}
 ```
 
 ## API Reference

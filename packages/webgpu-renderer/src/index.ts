@@ -8,6 +8,17 @@ export { Sprite } from "./renderer/Sprite";
 export { Primitive, Square } from "./renderer/Primitive";
 export { Texture } from "./renderer/Texture";
 
+// Tilemap exports
+export { Tile } from "./renderer/tilemap/Tile";
+export { TileSet, type TileSetOptions } from "./renderer/tilemap/TileSet";
+export {
+  TileMapLayer,
+  type TileData,
+  type LayerBounds,
+} from "./renderer/tilemap/TileMapLayer";
+export { TileMap, type TileMapOptions } from "./renderer/tilemap/TileMap";
+export { TileMapBatch } from "./renderer/tilemap/TileMapBatch";
+
 // Batching exports
 export { RenderBatch } from "./batching";
 

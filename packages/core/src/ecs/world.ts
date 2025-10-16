@@ -231,8 +231,33 @@ export class World {
   }
 
   public debug() {
-    // console.log a formatted string of the world archetypes
-    console.log(this.#archetypeByEntity);
-    console.log(this.#archetypeByKey);
+    // Sort by number of entities (descending) for better readability
+    const archetypes = Array.from(this.#archetypeByKey.values())
+      .map((arch) => ({
+        arch,
+        components: arch.getComponentClasses().map((c) => c.name),
+        count: arch.getRowCount(),
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const lines = ["World Archetypes:", "["];
+
+    for (const { components, count } of archetypes) {
+      if (count === 0) continue; // Skip empty archetypes
+      const componentList =
+        components.length > 0 ? components.join(", ") : "(no components)";
+      lines.push(
+        `  [${componentList}]: ${count} ${count === 1 ? "entity" : "entities"}`
+      );
+    }
+
+    lines.push("]");
+
+    const totalEntities = archetypes.reduce((sum, a) => sum + a.count, 0);
+    lines.push(
+      `\nTotal: ${totalEntities} ${totalEntities === 1 ? "entity" : "entities"} across ${archetypes.filter((a) => a.count > 0).length} archetype(s)`
+    );
+
+    console.log(lines.join("\n"));
   }
 }
