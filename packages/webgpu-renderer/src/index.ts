@@ -18,6 +18,10 @@ export {
 } from "./renderer/tilemap/TileMapLayer";
 export { TileMap, type TileMapOptions } from "./renderer/tilemap/TileMap";
 export { TileMapBatch } from "./renderer/tilemap/TileMapBatch";
+export {
+  TileMapChunk,
+  type ChunkBounds,
+} from "./renderer/tilemap/TileMapChunk";
 
 // Batching exports
 export { RenderBatch } from "./batching";

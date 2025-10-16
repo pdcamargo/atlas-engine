@@ -3,10 +3,12 @@ import { TileMapLayer } from "./TileMapLayer";
 import { TileSet } from "./TileSet";
 import { Tile } from "./Tile";
 import { Color } from "@atlas/core";
+import { TileMapChunk, ChunkBounds } from "./TileMapChunk";
 
 export interface TileMapOptions {
   tileWidth: number;
   tileHeight: number;
+  chunkSize?: number;
   id?: string;
 }
 
@@ -17,15 +19,18 @@ export interface TileMapOptions {
 export class TileMap extends SceneNode {
   public readonly tileWidth: number;
   public readonly tileHeight: number;
+  public readonly chunkSize: number;
 
   private layers: Map<string, TileMapLayer> = new Map();
   private layerOrder: string[] = []; // Maintain layer rendering order
+  private chunks: Map<string, TileMapChunk> = new Map(); // key: "chunkX,chunkY"
   private dirty: boolean = true;
 
   constructor(options: TileMapOptions) {
     super(options.id);
     this.tileWidth = options.tileWidth;
     this.tileHeight = options.tileHeight;
+    this.chunkSize = options.chunkSize ?? 10; // Default 10x10 tiles per chunk
   }
 
   /**
@@ -233,5 +238,113 @@ export class TileMap extends SceneNode {
     }
 
     return hasAnyTiles ? { minX, minY, maxX, maxY } : null;
+  }
+
+  /**
+   * Generate chunk key from coordinates
+   */
+  private getChunkKey(chunkX: number, chunkY: number): string {
+    return `${chunkX},${chunkY}`;
+  }
+
+  /**
+   * Calculate which chunk a tile belongs to
+   */
+  private getChunkCoords(
+    tileX: number,
+    tileY: number
+  ): {
+    chunkX: number;
+    chunkY: number;
+  } {
+    return {
+      chunkX: Math.floor(tileX / this.chunkSize),
+      chunkY: Math.floor(tileY / this.chunkSize),
+    };
+  }
+
+  /**
+   * Get all chunks
+   */
+  getChunks(): Map<string, TileMapChunk> {
+    return this.chunks;
+  }
+
+  /**
+   * Clear all chunks
+   */
+  clearChunks(): void {
+    for (const chunk of this.chunks.values()) {
+      chunk.destroy();
+    }
+    this.chunks.clear();
+  }
+
+  /**
+   * Build chunks from current layer data
+   */
+  buildChunks(device: GPUDevice): void {
+    // Clear existing chunks
+    this.clearChunks();
+
+    // Iterate through all layers and tiles
+    const layers = this.getLayers();
+    for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+      const layer = layers[layerIndex];
+      if (!layer.visible) continue;
+
+      const allTiles = layer.getAllTiles();
+      for (const { x, y, data } of allTiles) {
+        // Calculate chunk coordinates
+        const { chunkX, chunkY } = this.getChunkCoords(x, y);
+        const chunkKey = this.getChunkKey(chunkX, chunkY);
+
+        // Get or create chunk
+        let chunk = this.chunks.get(chunkKey);
+        if (!chunk) {
+          chunk = new TileMapChunk(chunkX, chunkY);
+          chunk.initialize(device);
+          this.chunks.set(chunkKey, chunk);
+        }
+
+        // Calculate final tint (layer tint * tile tint)
+        const finalTint = data.tint ? data.tint.clone() : layer.tint.clone();
+        if (data.tint && !data.tint.equals(layer.tint)) {
+          finalTint.multiplyColor(layer.tint);
+        }
+
+        // Add tile to chunk
+        chunk.addTile(x, y, data.tile, data.tileSet, layerIndex, finalTint);
+      }
+    }
+  }
+
+  /**
+   * Update world bounds for all chunks
+   */
+  updateChunkBounds(worldMatrix: Float32Array): void {
+    for (const chunk of this.chunks.values()) {
+      chunk.calculateWorldBounds(
+        this.chunkSize,
+        this.tileWidth,
+        this.tileHeight,
+        worldMatrix
+      );
+    }
+  }
+
+  /**
+   * Get chunks that are visible within the view bounds
+   */
+  getVisibleChunks(viewBounds: ChunkBounds): TileMapChunk[] {
+    const visible: TileMapChunk[] = [];
+
+    for (const chunk of this.chunks.values()) {
+      if (chunk.isInView(viewBounds)) {
+        visible.push(chunk);
+      }
+    }
+
+    return visible;
   }
 }
