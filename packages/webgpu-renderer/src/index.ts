@@ -5,6 +5,7 @@ export { SceneNode } from "./renderer/SceneNode";
 export { SceneGraph } from "./renderer/SceneGraph";
 export { Container } from "./renderer/Container";
 export { Sprite } from "./renderer/Sprite";
+export { InstancedSprite } from "./renderer/InstancedSprite";
 export { Primitive, Square } from "./renderer/Primitive";
 export { Texture } from "./renderer/Texture";
 

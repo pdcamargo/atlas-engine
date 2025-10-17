@@ -16,8 +16,15 @@ export class RenderBatch {
   // Instance rendering data
   private instanceData: Float32Array;
   private instanceBuffer?: GPUBuffer;
+  private instanceBufferId: number = 0; // Increments when buffer is recreated (for cache invalidation)
   private device?: GPUDevice;
   private instanceCount: number = 0; // Track actual number of instances packed
+
+  // Phase 4: Persistent buffer optimization
+  private persistentBufferCapacity: number = 0; // Current buffer capacity in sprites
+  private spriteToSlotMap: Map<Sprite, number> = new Map(); // Maps sprite → buffer slot index
+  private freeSlots: number[] = []; // Available slots for new sprites
+  private dirtyRanges: Array<{ start: number; end: number }> = []; // Dirty buffer ranges to upload
 
   // Threshold for when to use instancing vs individual draws
   private static readonly INSTANCING_THRESHOLD = 1;
@@ -25,6 +32,10 @@ export class RenderBatch {
   // Bytes per sprite instance: 2 floats (position) + 2 floats (size) + 4 floats (frame) + 4 floats (tint) = 12 floats = 48 bytes
   private static readonly BYTES_PER_INSTANCE = 48;
   private static readonly FLOATS_PER_INSTANCE = 12;
+
+  // Persistent buffer settings
+  private static readonly INITIAL_BUFFER_CAPACITY = 1000; // Start with 1000 sprites
+  private static readonly BUFFER_GROWTH_FACTOR = 1.5; // Grow by 50% when full
 
   // Frustum culling can be expensive for many sprites - make it optional
   public enableFrustumCulling: boolean = false;
@@ -43,21 +54,43 @@ export class RenderBatch {
 
   /**
    * Add a sprite to this batch
+   * Phase 4: Allocates a persistent slot for the sprite
    */
   addSprite(sprite: Sprite): void {
     if (this.sprites.has(sprite)) return;
 
     this.sprites.add(sprite);
+
+    // Allocate a slot for this sprite
+    let slot: number;
+    if (this.freeSlots.length > 0) {
+      // Reuse a free slot
+      slot = this.freeSlots.pop()!;
+    } else {
+      // Allocate a new slot
+      slot = this.spriteToSlotMap.size;
+    }
+
+    this.spriteToSlotMap.set(sprite, slot);
     this.markDirty();
   }
 
   /**
    * Remove a sprite from this batch
+   * Phase 4: Frees the sprite's slot for reuse
    */
   removeSprite(sprite: Sprite): void {
     if (!this.sprites.has(sprite)) return;
 
     this.sprites.delete(sprite);
+
+    // Free the sprite's slot
+    const slot = this.spriteToSlotMap.get(sprite);
+    if (slot !== undefined) {
+      this.spriteToSlotMap.delete(sprite);
+      this.freeSlots.push(slot);
+    }
+
     this.markDirty();
   }
 
@@ -124,12 +157,17 @@ export class RenderBatch {
 
   /**
    * Update instance data for all visible sprites
-   * Should be called before rendering if isDirty
-   * Includes frustum culling using camera
+   * Phase 4: Uses persistent buffers with slot allocation and partial updates
+   *
+   * Key optimizations:
+   * - Persistent buffer (no reallocation)
+   * - Slot-based addressing (sprites keep same position in buffer)
+   * - Only updates dirty sprites (tracks dirty ranges)
+   * - Partial GPU uploads (only dirty ranges)
    */
   updateInstanceData(camera: Camera): void {
     if (!this.shouldUseInstancing()) {
-      return; // Don't need instance data for individual rendering
+      return;
     }
 
     // Get visible sprites and optionally apply frustum culling
@@ -147,46 +185,139 @@ export class RenderBatch {
       return;
     }
 
-    // Resize instance data buffer if needed
-    const requiredSize = this.instanceCount * RenderBatch.FLOATS_PER_INSTANCE;
-    if (this.instanceData.length < requiredSize) {
-      this.instanceData = new Float32Array(requiredSize);
+    // Ensure buffer is large enough for all sprites (using persistent allocation)
+    this.ensureBufferCapacity();
+
+    // Clear dirty ranges from previous frame
+    this.dirtyRanges = [];
+
+    if (this.isDirty) {
+      // Full rebuild - batch structure changed (sprites added/removed)
+      // Pack all visible sprites into their allocated slots
+      for (const sprite of visibleSprites) {
+        const slot = this.spriteToSlotMap.get(sprite);
+        if (slot !== undefined) {
+          const offset = slot * RenderBatch.FLOATS_PER_INSTANCE;
+          this.packSpriteInstanceData(sprite, offset);
+          this.markRangeDirty(slot, slot + 1);
+        }
+      }
+      this.isDirty = false;
+    } else {
+      // Partial update - only update dirty sprites
+      // This is the common case: sprites move but batch structure is stable
+      for (const sprite of visibleSprites) {
+        // Check if this sprite's transform changed
+        if ((sprite as any)._dirty || (sprite as any)._worldTransformDirty) {
+          const slot = this.spriteToSlotMap.get(sprite);
+          if (slot !== undefined) {
+            const offset = slot * RenderBatch.FLOATS_PER_INSTANCE;
+            this.packSpriteInstanceData(sprite, offset);
+            this.markRangeDirty(slot, slot + 1);
+          }
+        }
+      }
     }
 
-    // Pack instance data for each visible sprite
-    let offset = 0;
+    // Coalesce dirty ranges to minimize GPU uploads
+    this.coalesceDirtyRanges();
+  }
 
-    for (const sprite of visibleSprites) {
-      // Get world transform
-      const modelMatrix = sprite.getWorldMatrix();
+  /**
+   * Ensure the persistent buffer has enough capacity for all sprites
+   */
+  private ensureBufferCapacity(): void {
+    const requiredCapacity = Math.max(
+      this.spriteToSlotMap.size,
+      RenderBatch.INITIAL_BUFFER_CAPACITY
+    );
 
-      // Extract world position (x, y) from model matrix
-      const worldX = modelMatrix[12];
-      const worldY = modelMatrix[13];
-
-      // Extract scale from model matrix and apply sprite dimensions
-      const scaleX = Math.sqrt(
-        modelMatrix[0] * modelMatrix[0] + modelMatrix[1] * modelMatrix[1]
+    if (this.persistentBufferCapacity < requiredCapacity) {
+      // Grow buffer capacity
+      const newCapacity = Math.ceil(
+        requiredCapacity * RenderBatch.BUFFER_GROWTH_FACTOR
       );
-      const scaleY = Math.sqrt(
-        modelMatrix[4] * modelMatrix[4] + modelMatrix[5] * modelMatrix[5]
-      );
+      const newSize = newCapacity * RenderBatch.FLOATS_PER_INSTANCE;
 
-      const worldSizeX = sprite.width * scaleX;
-      const worldSizeY = sprite.height * scaleY;
+      // Create new Float32Array with larger capacity
+      const newInstanceData = new Float32Array(newSize);
 
-      // Pack data: position (2) + size (2) + frame (4) + tint (4) = 12 floats
-      this.instanceData[offset + 0] = worldX;
-      this.instanceData[offset + 1] = worldY;
-      this.instanceData[offset + 2] = worldSizeX;
-      this.instanceData[offset + 3] = worldSizeY;
-      this.instanceData.set(sprite.frame.data, offset + 4);
-      this.instanceData.set(sprite.tint.data, offset + 8);
+      // Copy old data if it exists
+      if (this.instanceData.length > 0) {
+        newInstanceData.set(this.instanceData);
+      }
 
-      offset += RenderBatch.FLOATS_PER_INSTANCE;
+      this.instanceData = newInstanceData;
+      this.persistentBufferCapacity = newCapacity;
+
+      // Force buffer recreation on GPU side
+      if (this.instanceBuffer) {
+        this.instanceBuffer.destroy();
+        this.instanceBuffer = undefined;
+      }
+    }
+  }
+
+  /**
+   * Mark a range of slots as dirty (needs GPU upload)
+   */
+  private markRangeDirty(startSlot: number, endSlot: number): void {
+    this.dirtyRanges.push({ start: startSlot, end: endSlot });
+  }
+
+  /**
+   * Coalesce overlapping/adjacent dirty ranges to minimize GPU uploads
+   * Example: [0-5], [3-8], [10-12] → [0-8], [10-12]
+   */
+  private coalesceDirtyRanges(): void {
+    if (this.dirtyRanges.length <= 1) return;
+
+    // Sort by start position
+    this.dirtyRanges.sort((a, b) => a.start - b.start);
+
+    // Merge overlapping/adjacent ranges
+    const coalesced: Array<{ start: number; end: number }> = [];
+    let current = this.dirtyRanges[0];
+
+    for (let i = 1; i < this.dirtyRanges.length; i++) {
+      const next = this.dirtyRanges[i];
+
+      // If ranges overlap or are adjacent, merge them
+      if (next.start <= current.end) {
+        current.end = Math.max(current.end, next.end);
+      } else {
+        // Gap found, save current and start new range
+        coalesced.push(current);
+        current = next;
+      }
     }
 
-    this.isDirty = false;
+    coalesced.push(current);
+    this.dirtyRanges = coalesced;
+  }
+
+  /**
+   * Pack a single sprite's data into instance buffer at given offset
+   * Extracted to avoid code duplication
+   */
+  private packSpriteInstanceData(sprite: Sprite, offset: number): void {
+    // Get cached world position (no matrix extraction, just array access)
+    const worldPos = sprite.getWorldPosition();
+    const worldX = worldPos.x;
+    const worldY = worldPos.y;
+
+    // Get cached world scale (no sqrt operations!)
+    const worldScale = sprite.getWorldScale();
+    const worldSizeX = sprite.width * worldScale.x;
+    const worldSizeY = sprite.height * worldScale.y;
+
+    // Pack data: position (2) + size (2) + frame (4) + tint (4) = 12 floats
+    this.instanceData[offset + 0] = worldX;
+    this.instanceData[offset + 1] = worldY;
+    this.instanceData[offset + 2] = worldSizeX;
+    this.instanceData[offset + 3] = worldSizeY;
+    this.instanceData.set(sprite.frame.data, offset + 4);
+    this.instanceData.set(sprite.tint.data, offset + 8);
   }
 
   /**
@@ -201,32 +332,70 @@ export class RenderBatch {
   }
 
   /**
+   * Get dirty ranges for partial GPU upload
+   * Phase 4: Returns only the ranges that changed this frame
+   * Returns null if full upload is needed
+   */
+  getDirtyRanges(): Array<{ start: number; end: number }> | null {
+    if (this.dirtyRanges.length === 0) {
+      return null; // Nothing dirty
+    }
+
+    // If dirty ranges cover >80% of buffer, just upload everything
+    // (avoids overhead of multiple small uploads)
+    const totalDirtySlots = this.dirtyRanges.reduce(
+      (sum, range) => sum + (range.end - range.start),
+      0
+    );
+    const coverage = totalDirtySlots / Math.max(this.instanceCount, 1);
+
+    if (coverage > 0.8) {
+      return null; // Upload everything
+    }
+
+    return this.dirtyRanges;
+  }
+
+  /**
    * Get instance buffer, creating it if necessary
+   * Phase 4: Uses persistent buffer capacity instead of instanceCount
    */
   getOrCreateInstanceBuffer(): GPUBuffer {
     if (!this.device) {
       throw new Error("RenderBatch not initialized with device");
     }
 
-    const requiredSize = this.instanceCount * RenderBatch.BYTES_PER_INSTANCE;
+    // Use persistent buffer capacity (not instanceCount) to avoid recreations
+    const requiredSize =
+      this.persistentBufferCapacity * RenderBatch.BYTES_PER_INSTANCE;
 
-    // Create or resize buffer if needed
+    // Create buffer if it doesn't exist or is too small
     if (!this.instanceBuffer || this.instanceBuffer.size < requiredSize) {
       // Destroy old buffer
       if (this.instanceBuffer) {
         this.instanceBuffer.destroy();
       }
 
-      // Create new buffer with some extra space to avoid frequent recreations
-      const bufferSize = Math.max(requiredSize, 1024) * 1.5; // 50% extra space
+      // Create new buffer using persistent capacity
       this.instanceBuffer = this.device.createBuffer({
-        size: Math.ceil(bufferSize),
+        size: requiredSize,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        label: `Instance Buffer (Texture ${this.texture.id})`,
+        label: `Instance Buffer (Texture ${this.texture.id}, Cap: ${this.persistentBufferCapacity})`,
       });
+
+      // Increment buffer ID to invalidate cached bind groups
+      this.instanceBufferId++;
     }
 
     return this.instanceBuffer;
+  }
+
+  /**
+   * Get the buffer ID (increments when buffer is recreated)
+   * Used for bind group cache invalidation
+   */
+  getBufferId(): number {
+    return this.instanceBufferId;
   }
 
   /**

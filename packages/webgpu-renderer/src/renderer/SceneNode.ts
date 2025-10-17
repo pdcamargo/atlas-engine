@@ -32,6 +32,12 @@ export class SceneNode {
   protected _worldMatrix: Mat4 = mat4.create();
   protected _dirty: boolean = true;
 
+  // Cached world transform components (to avoid expensive matrix extraction)
+  // These are updated when world matrix is computed, avoiding sqrt() operations
+  protected _worldPosition: Vector3 = new Vector3();
+  protected _worldScale: Vector3 = new Vector3(1, 1, 1);
+  protected _worldTransformDirty: boolean = true;
+
   public visible: boolean = true;
 
   // Static nodes have transforms calculated once and cached
@@ -98,6 +104,7 @@ export class SceneNode {
    */
   markDirty(): void {
     this._dirty = true;
+    this._worldTransformDirty = true;
     for (const child of this._children) {
       child.markDirty();
     }
@@ -131,12 +138,62 @@ export class SceneNode {
       }
 
       this._dirty = false;
+      this._worldTransformDirty = true; // Need to extract world position/scale
     }
 
     // Update children (they handle their own dirty flags)
     for (const child of this._children) {
       child.updateWorldMatrix(this._worldMatrix);
     }
+  }
+
+  /**
+   * Get world position (cached, no matrix extraction)
+   * Much faster than extracting from matrix every time
+   */
+  getWorldPosition(): Vector3 {
+    if (this._worldTransformDirty) {
+      this.updateWorldTransformCache();
+    }
+    return this._worldPosition;
+  }
+
+  /**
+   * Get world scale (cached, no expensive sqrt operations)
+   * Extracts scale from world matrix only when dirty
+   */
+  getWorldScale(): Vector3 {
+    if (this._worldTransformDirty) {
+      this.updateWorldTransformCache();
+    }
+    return this._worldScale;
+  }
+
+  /**
+   * Update cached world transform components from world matrix
+   * Called only when world matrix changes (not every frame)
+   */
+  protected updateWorldTransformCache(): void {
+    const m = this._worldMatrix;
+
+    // Extract position (translation) - simple array access, no math
+    this._worldPosition.x = m[12];
+    this._worldPosition.y = m[13];
+    this._worldPosition.z = m[14];
+
+    // Extract scale - use sqrt only when actually needed (when matrix changes)
+    // For flat sprites (no parent), this is just the local scale
+    if (this._parent) {
+      // Has parent, need to extract from combined matrix
+      this._worldScale.x = Math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
+      this._worldScale.y = Math.sqrt(m[4] * m[4] + m[5] * m[5] + m[6] * m[6]);
+      this._worldScale.z = Math.sqrt(m[8] * m[8] + m[9] * m[9] + m[10] * m[10]);
+    } else {
+      // No parent, world scale = local scale (no sqrt needed!)
+      this._worldScale.copyFrom(this.scale);
+    }
+
+    this._worldTransformDirty = false;
   }
 
   /**

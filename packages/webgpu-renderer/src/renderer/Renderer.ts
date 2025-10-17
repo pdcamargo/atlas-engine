@@ -61,11 +61,6 @@ export class WebgpuRenderer {
   // Batch management for instanced rendering
   private batches = new Map<string, RenderBatch>(); // textureId -> RenderBatch
 
-  // TileMap batch management
-  private tileMapBatches = new Map<string, Map<string, TileMapBatch>>(); // tileMapId -> (tileSetId -> TileMapBatch)
-  private tileMapLastVPMatrix = new Map<string, Float32Array>(); // tileMapId -> last view-projection matrix
-  private tileMapLastWorldMatrix = new Map<string, Float32Array>(); // tileMapId -> last world matrix
-
   // Shared geometry buffers
   private quadBuffers: {
     buffers: GPUBuffer[];
@@ -364,6 +359,7 @@ export class WebgpuRenderer {
 
   /**
    * Build/update batches from the scene graph
+   * Only marks batches dirty when sprites are added/removed, not every frame
    */
   private updateBatches(sceneGraph: SceneGraph): void {
     // Track which sprites are currently in the scene
@@ -383,9 +379,6 @@ export class WebgpuRenderer {
       }
     });
 
-    // Debug logging (comment out for production)
-    // console.log(`[Renderer] Found ${currentSprites.size} sprites in ${spritesByTexture.size} texture groups`);
-
     // Remove sprites from batches that are no longer in the scene
     for (const [textureId, batch] of this.batches) {
       const spritesForThisTexture = spritesByTexture.get(textureId);
@@ -396,10 +389,17 @@ export class WebgpuRenderer {
         this.batches.delete(textureId);
       } else {
         // Remove sprites that are no longer in scene
+        let removedAny = false;
         for (const sprite of batch.getAllSprites()) {
           if (!currentSprites.has(sprite)) {
             batch.removeSprite(sprite);
+            removedAny = true;
           }
+        }
+        // Only mark dirty if we actually removed sprites
+        // Individual sprite movement is handled by per-sprite dirty tracking
+        if (removedAny) {
+          batch.markDirty();
         }
       }
     }
@@ -416,18 +416,20 @@ export class WebgpuRenderer {
         batch = new RenderBatch(firstSprite.texture);
         batch.initialize(this.device);
         this.batches.set(textureId, batch);
-        // console.log(`[Renderer] Created batch for texture ${textureId}`);
       }
 
-      // Add any new sprites to batch
+      // Add any new sprites to batch (only marks dirty if sprite was added)
       for (const sprite of sprites) {
         if (!batch.hasSprite(sprite)) {
-          batch.addSprite(sprite);
+          batch.addSprite(sprite); // This calls markDirty internally
         }
       }
 
-      // Mark batch as dirty each frame since sprites might have moved
-      batch.markDirty();
+      // Note: We no longer mark all batches dirty every frame
+      // Batches are only marked dirty when:
+      // 1. Sprites are added (above)
+      // 2. Sprites are removed (above)
+      // 3. Individual sprites change (handled in RenderBatch.updateInstanceData)
     }
   }
 
@@ -516,7 +518,8 @@ export class WebgpuRenderer {
       throw new Error("Instanced pipeline not initialized");
     }
 
-    // Update instance data for all sprites in batch
+    // Always update instance data (handles both batch changes and individual sprite movement)
+    // The updateInstanceData method is smart enough to only update changed sprites
     batch.updateInstanceData(camera);
 
     const instanceDataInfo = batch.getInstanceData();
@@ -524,32 +527,67 @@ export class WebgpuRenderer {
 
     // Upload VP matrix to GPU (once per batch)
     const vpMatrix = camera.getViewProjectionMatrix();
-    this.device.queue.writeBuffer(
-      this.vpMatrixBuffer,
-      0,
-      vpMatrix.data as Float32Array
-    );
+    this.device.queue.writeBuffer(this.vpMatrixBuffer, 0, vpMatrix.data);
 
     // Get or create instance buffer
     const instanceBuffer = batch.getOrCreateInstanceBuffer();
 
-    // Write instance data to GPU (48 bytes per instance = 12 floats)
-    const instanceDataToWrite = instanceDataInfo.data.subarray(
-      0,
-      instanceDataInfo.count * 12
-    );
-    this.device.queue.writeBuffer(instanceBuffer, 0, instanceDataToWrite);
+    // Phase 4: Partial GPU upload - only upload dirty ranges
+    const dirtyRanges = batch.getDirtyRanges();
 
-    // Create bind group with 4 bindings
-    const bindGroup = this.device.createBindGroup({
-      layout: this.spriteInstancedBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.vpMatrixBuffer } }, // VP matrix uniform
-        { binding: 1, resource: { buffer: instanceBuffer } }, // Instance data storage
-        { binding: 2, resource: batch.texture.sampler }, // Texture sampler
-        { binding: 3, resource: this.getOrCreateTextureView(batch.texture) }, // Texture view
-      ],
-    });
+    if (dirtyRanges === null) {
+      // Full upload (first frame or >80% dirty)
+      const instanceDataToWrite = instanceDataInfo.data.subarray(
+        0,
+        instanceDataInfo.count * 12
+      );
+      this.device.queue.writeBuffer(
+        instanceBuffer,
+        0,
+        instanceDataToWrite.buffer,
+        instanceDataToWrite.byteOffset,
+        instanceDataToWrite.byteLength
+      );
+    } else if (dirtyRanges.length > 0) {
+      // Partial upload - only upload dirty ranges
+      const FLOATS_PER_INSTANCE = 12;
+      const BYTES_PER_INSTANCE = 48;
+
+      for (const range of dirtyRanges) {
+        const startFloat = range.start * FLOATS_PER_INSTANCE;
+        const endFloat = range.end * FLOATS_PER_INSTANCE;
+        const rangeData = instanceDataInfo.data.subarray(startFloat, endFloat);
+
+        const offsetBytes = range.start * BYTES_PER_INSTANCE;
+        this.device.queue.writeBuffer(
+          instanceBuffer,
+          offsetBytes,
+          rangeData.buffer,
+          rangeData.byteOffset,
+          rangeData.byteLength
+        );
+      }
+    }
+    // If dirtyRanges.length === 0, skip upload (nothing changed)
+
+    // Create or get cached bind group (same pattern as tilemap)
+    // Cache key: textureId_bufferId (buffer ID changes when buffer is recreated)
+    const bufferId = batch.getBufferId();
+    const cacheKey = `${batch.texture.id}_${bufferId}`;
+
+    let bindGroup = this.bindGroupCache.get(cacheKey);
+    if (!bindGroup) {
+      bindGroup = this.device.createBindGroup({
+        layout: this.spriteInstancedBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.vpMatrixBuffer } }, // VP matrix uniform
+          { binding: 1, resource: { buffer: instanceBuffer } }, // Instance data storage
+          { binding: 2, resource: batch.texture.sampler }, // Texture sampler
+          { binding: 3, resource: this.getOrCreateTextureView(batch.texture) }, // Texture view
+        ],
+      });
+      this.bindGroupCache.set(cacheKey, bindGroup);
+    }
 
     // Draw instanced
     renderPass.setPipeline(this.spriteInstancedPipeline);
@@ -890,11 +928,7 @@ export class WebgpuRenderer {
 
     // Upload VP matrix to GPU (once per tilemap)
     if (this.vpMatrixBuffer) {
-      this.device.queue.writeBuffer(
-        this.vpMatrixBuffer,
-        0,
-        vpMatrix as Float32Array
-      );
+      this.device.queue.writeBuffer(this.vpMatrixBuffer, 0, vpMatrix);
     }
 
     // Count total tiles

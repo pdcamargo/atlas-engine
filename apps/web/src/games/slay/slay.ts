@@ -232,10 +232,14 @@ export class SlayGamePlugin implements EcsPlugin {
         tilemap.setPosition({ x: -5, y: 5 });
 
         const layer = tilemap.addLayer("default");
+        const layer2 = tilemap.addLayer("default2");
+        const layer3 = tilemap.addLayer("default3");
 
-        for (let i = 0; i < 2048; i++) {
-          for (let j = 0; j < 2048; j++) {
+        for (let i = 0; i < 150; i++) {
+          for (let j = 0; j < 150; j++) {
             layer.setTile(i, -j, tileSet, tileSet.getTile(0)!);
+            // layer2.setTile(i, -j, tileSet, tileSet.getTile(0)!);
+            // layer3.setTile(i, -j, tileSet, tileSet.getTile(0)!);
           }
         }
 
@@ -245,7 +249,7 @@ export class SlayGamePlugin implements EcsPlugin {
         // layer.setTile(2, 0, tileSet, tileSet.getTile(2)!);
         // layer.setTile(3, 0, tileSet, tileSet.getTile(3)!);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5000; i++) {
           const sprite = new Sprite(texture);
           sprite.setSize(0.5, 0.5);
           sprite.setTint(

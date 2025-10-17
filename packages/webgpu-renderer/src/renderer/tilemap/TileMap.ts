@@ -247,7 +247,7 @@ export class TileMap extends SceneNode {
   private getChunkKey(chunkX: number, chunkY: number): number {
     // Pack two 16-bit signed integers into one 32-bit integer
     // Supports chunk coordinates from -32768 to 32767
-    return ((chunkX & 0xFFFF) | ((chunkY & 0xFFFF) << 16)) >>> 0;
+    return ((chunkX & 0xffff) | ((chunkY & 0xffff) << 16)) >>> 0;
   }
 
   /**
@@ -356,7 +356,10 @@ export class TileMap extends SceneNode {
       // Add all 9 positions (current + 8 neighbors)
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
-          const neighborKey = this.getChunkKey(chunk.chunkX + dx, chunk.chunkY + dy);
+          const neighborKey = this.getChunkKey(
+            chunk.chunkX + dx,
+            chunk.chunkY + dy
+          );
           chunksToAdd.add(neighborKey);
         }
       }

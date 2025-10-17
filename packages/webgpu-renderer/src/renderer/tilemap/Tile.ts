@@ -6,7 +6,7 @@ import { Rect } from "@atlas/core";
  */
 export class Tile {
   public readonly id: number | string;
-  public readonly frame: Rect;
+  public frame: Rect;
   public readonly metadata?: Record<string, any>;
 
   constructor(
