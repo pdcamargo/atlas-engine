@@ -23,7 +23,7 @@ export class TileMap extends SceneNode {
 
   private layers: Map<string, TileMapLayer> = new Map();
   private layerOrder: string[] = []; // Maintain layer rendering order
-  private chunks: Map<string, TileMapChunk> = new Map(); // key: "chunkX,chunkY"
+  private chunks: Map<number, TileMapChunk> = new Map(); // key: integer hash of (chunkX,chunkY)
   private dirty: boolean = true;
 
   constructor(options: TileMapOptions) {
@@ -241,10 +241,13 @@ export class TileMap extends SceneNode {
   }
 
   /**
-   * Generate chunk key from coordinates
+   * Generate chunk key from coordinates using integer hashing
+   * This avoids string allocation and provides faster lookups
    */
-  private getChunkKey(chunkX: number, chunkY: number): string {
-    return `${chunkX},${chunkY}`;
+  private getChunkKey(chunkX: number, chunkY: number): number {
+    // Pack two 16-bit signed integers into one 32-bit integer
+    // Supports chunk coordinates from -32768 to 32767
+    return ((chunkX & 0xFFFF) | ((chunkY & 0xFFFF) << 16)) >>> 0;
   }
 
   /**
@@ -266,7 +269,7 @@ export class TileMap extends SceneNode {
   /**
    * Get all chunks
    */
-  getChunks(): Map<string, TileMapChunk> {
+  getChunks(): Map<number, TileMapChunk> {
     return this.chunks;
   }
 
@@ -338,25 +341,22 @@ export class TileMap extends SceneNode {
    * This provides a natural padding buffer to prevent tile popping
    */
   getVisibleChunks(viewBounds: ChunkBounds): TileMapChunk[] {
-    const visibleChunkKeys = new Set<string>();
+    const visibleChunks: TileMapChunk[] = [];
 
     // First pass: find directly visible chunks
     for (const chunk of this.chunks.values()) {
       if (chunk.isInView(viewBounds)) {
-        const key = this.getChunkKey(chunk.chunkX, chunk.chunkY);
-        visibleChunkKeys.add(key);
+        visibleChunks.push(chunk);
       }
     }
 
     // Second pass: add adjacent chunks (8 neighbors)
-    const chunksToAdd = new Set<string>();
-    for (const chunkKey of visibleChunkKeys) {
-      const [chunkX, chunkY] = chunkKey.split(",").map(Number);
-
-      // Add all 8 neighbors
+    const chunksToAdd = new Set<number>();
+    for (const chunk of visibleChunks) {
+      // Add all 9 positions (current + 8 neighbors)
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
-          const neighborKey = this.getChunkKey(chunkX + dx, chunkY + dy);
+          const neighborKey = this.getChunkKey(chunk.chunkX + dx, chunk.chunkY + dy);
           chunksToAdd.add(neighborKey);
         }
       }

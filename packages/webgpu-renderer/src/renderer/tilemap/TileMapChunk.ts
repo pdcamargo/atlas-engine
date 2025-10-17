@@ -3,6 +3,7 @@ import { TileMapBatch } from "./TileMapBatch";
 import { TileSet } from "./TileSet";
 import { Tile } from "./Tile";
 import { Color } from "@atlas/core";
+import { LRUCache } from "../../utils/LRUCache";
 
 export interface ChunkBounds {
   left: number;
@@ -23,6 +24,12 @@ export class TileMapChunk {
   // One batch per tileset used in this chunk
   private batches = new Map<string, TileMapBatch>();
   private device?: GPUDevice;
+
+  // Cached world matrix values for bounds calculation
+  private cachedWorldMatrixHash: number = NaN; // Use NaN as sentinel for "not cached"
+  private cachedChunkSize: number = 0;
+  private cachedTileWidth: number = 0;
+  private cachedTileHeight: number = 0;
 
   constructor(chunkX: number, chunkY: number) {
     this.chunkX = chunkX;
@@ -68,7 +75,7 @@ export class TileMapChunk {
   }
 
   /**
-   * Calculate world bounds for this chunk
+   * Calculate world bounds for this chunk (with caching)
    */
   calculateWorldBounds(
     chunkSize: number,
@@ -76,6 +83,23 @@ export class TileMapChunk {
     tileHeight: number,
     worldMatrix: Float32Array
   ): void {
+    // Create a simple hash of the world matrix (using key transform values)
+    const worldMatrixHash =
+      worldMatrix[0] * 1000 +
+      worldMatrix[5] * 100 +
+      worldMatrix[12] * 10 +
+      worldMatrix[13];
+
+    // Check if we can use cached bounds
+    if (
+      this.cachedWorldMatrixHash === worldMatrixHash &&
+      this.cachedChunkSize === chunkSize &&
+      this.cachedTileWidth === tileWidth &&
+      this.cachedTileHeight === tileHeight
+    ) {
+      return; // Use cached worldBounds
+    }
+
     // Extract world transform
     const tileMapWorldX = worldMatrix[12];
     const tileMapWorldY = worldMatrix[13];
@@ -93,6 +117,12 @@ export class TileMapChunk {
       bottom: tileMapWorldY + this.chunkY * chunkSize * tileHeight * scaleY,
       top: tileMapWorldY + (this.chunkY + 1) * chunkSize * tileHeight * scaleY,
     };
+
+    // Cache the parameters
+    this.cachedWorldMatrixHash = worldMatrixHash;
+    this.cachedChunkSize = chunkSize;
+    this.cachedTileWidth = tileWidth;
+    this.cachedTileHeight = tileHeight;
   }
 
   /**
@@ -144,7 +174,9 @@ export class TileMapChunk {
       indexBuffer?: GPUBuffer;
       indexFormat?: GPUIndexFormat;
     },
-    textureViewCache: Map<string, GPUTextureView>
+    textureViewCache: Map<string, GPUTextureView>,
+    bindGroupCache: LRUCache<string, GPUBindGroup>,
+    vpMatrixBuffer: GPUBuffer
   ): void {
     for (const batch of this.batches.values()) {
       if (batch.isEmpty()) continue;
@@ -164,7 +196,7 @@ export class TileMapChunk {
         0,
         instanceDataInfo.data.buffer,
         0,
-        instanceDataInfo.count * 96 // 96 bytes per instance
+        instanceDataInfo.count * 48 // 48 bytes per instance (GPU-optimized)
       );
 
       // Get or create texture view
@@ -174,14 +206,20 @@ export class TileMapChunk {
         textureViewCache.set(batch.tileSet.texture.id, textureView);
       }
 
-      // Create bind group
-      const bindGroup = device.createBindGroup({
-        layout: spriteInstancedBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: instanceBuffer } },
-          { binding: 1, resource: batch.tileSet.texture.sampler },
-          { binding: 2, resource: textureView },
-        ],
+      // Create bind group key (textureId + bufferId)
+      const bindGroupKey = `${batch.tileSet.texture.id}_${batch.getBufferId()}`;
+
+      // Get or create bind group using cache
+      const bindGroup = bindGroupCache.getOrCreate(bindGroupKey, () => {
+        return device.createBindGroup({
+          layout: spriteInstancedBindGroupLayout,
+          entries: [
+            { binding: 0, resource: { buffer: vpMatrixBuffer } }, // VP matrix uniform
+            { binding: 1, resource: { buffer: instanceBuffer } }, // Instance data storage
+            { binding: 2, resource: batch.tileSet.texture.sampler },
+            { binding: 3, resource: textureView },
+          ],
+        });
       });
 
       // Draw instanced

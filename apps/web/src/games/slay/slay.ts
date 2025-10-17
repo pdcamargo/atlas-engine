@@ -223,7 +223,6 @@ export class SlayGamePlugin implements EcsPlugin {
         const tilemap = new TileMap({
           tileWidth: 16,
           tileHeight: 16,
-          chunkSize: 15,
         });
 
         const tileSet = new TileSet(texture5, 16, 16);
@@ -233,14 +232,10 @@ export class SlayGamePlugin implements EcsPlugin {
         tilemap.setPosition({ x: -5, y: 5 });
 
         const layer = tilemap.addLayer("default");
-        const layer2 = tilemap.addLayer("default2");
-        const layer3 = tilemap.addLayer("default3");
 
-        for (let i = 0; i < 1024; i++) {
-          for (let j = 0; j < 1024; j++) {
+        for (let i = 0; i < 2048; i++) {
+          for (let j = 0; j < 2048; j++) {
             layer.setTile(i, -j, tileSet, tileSet.getTile(0)!);
-            layer2.setTile(i, -j, tileSet, tileSet.getTile(207)!);
-            layer3.setTile(i, -j, tileSet, tileSet.getTile(111)!);
           }
         }
 

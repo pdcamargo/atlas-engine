@@ -11,6 +11,9 @@ interface TileInstance {
   layerIndex: number;
 }
 
+// Global buffer ID counter for unique bind group keys
+let globalBufferId = 0;
+
 /**
  * TileMapBatch batches tiles by tileset for instanced rendering
  * Similar to RenderBatch but optimized for static tilemap data
@@ -22,20 +25,22 @@ export class TileMapBatch {
   private instanceBuffer?: GPUBuffer;
   private device?: GPUDevice;
   private instanceCount: number = 0;
+  private bufferId: number; // Unique ID for bind group caching (globally unique)
 
-  // Bytes per tile instance: 16 floats (matrix) + 4 floats (frame) + 4 floats (tint) = 24 floats = 96 bytes
-  private static readonly BYTES_PER_INSTANCE = 96;
-  private static readonly FLOATS_PER_INSTANCE = 24;
-
-  // Reusable buffers to avoid GC pressure
-  private mvpMatrix: Mat4 = mat4.create();
-  private tileModelMatrix: Mat4 = mat4.create();
-  private translationVec: Float32Array = new Float32Array([0, 0, 0]);
-  private scaleVec: Float32Array = new Float32Array([1, 1, 1]);
+  // Bytes per tile instance (GPU-optimized layout):
+  // - position (2 floats = 8 bytes)
+  // - size (2 floats = 8 bytes)
+  // - frame (4 floats = 16 bytes)
+  // - tint (4 floats = 16 bytes)
+  // Total: 12 floats = 48 bytes (was 96 bytes - 50% reduction!)
+  private static readonly BYTES_PER_INSTANCE = 48;
+  private static readonly FLOATS_PER_INSTANCE = 12;
 
   constructor(tileSet: TileSet) {
     this.tileSet = tileSet;
     this.instanceData = new Float32Array(0);
+    // Assign globally unique buffer ID
+    this.bufferId = ++globalBufferId;
   }
 
   /**
@@ -82,7 +87,7 @@ export class TileMapBatch {
 
   /**
    * Rebuild instance data for all tiles
-   * This should be called when the tilemap is dirty
+   * GPU-optimized: stores position+size, MVP computed in vertex shader
    */
   rebuild(
     vpMatrix: Mat4,
@@ -102,42 +107,37 @@ export class TileMapBatch {
       this.instanceData = new Float32Array(requiredSize);
     }
 
+    // Extract world transform from matrix
+    const worldX = worldMatrix[12];
+    const worldY = worldMatrix[13];
+    const scaleX = Math.sqrt(
+      worldMatrix[0] * worldMatrix[0] + worldMatrix[1] * worldMatrix[1]
+    );
+    const scaleY = Math.sqrt(
+      worldMatrix[4] * worldMatrix[4] + worldMatrix[5] * worldMatrix[5]
+    );
+
     // Pack instance data for each tile
     let offset = 0;
 
     for (const tileInstance of this.tiles) {
-      // Start with world matrix (copy using gl-matrix)
-      mat4.copy(this.tileModelMatrix, worldMatrix as Float32Array);
+      // Calculate world position (tilemap transform applied)
+      const worldPosX = worldX + tileInstance.x * tileWidth * scaleX;
+      const worldPosY = worldY + tileInstance.y * tileHeight * scaleY;
 
-      // Apply translation to tile position using gl-matrix
-      const tileX = tileInstance.x * tileWidth;
-      const tileY = tileInstance.y * tileHeight;
-      this.translationVec[0] = tileX;
-      this.translationVec[1] = tileY;
-      this.translationVec[2] = 0;
-      mat4.translate(
-        this.tileModelMatrix,
-        this.tileModelMatrix,
-        this.translationVec
-      );
+      // Calculate world size (tilemap scale applied)
+      const worldSizeX = tileWidth * scaleX;
+      const worldSizeY = tileHeight * scaleY;
 
-      // Apply tile size scaling using gl-matrix
-      this.scaleVec[0] = tileWidth;
-      this.scaleVec[1] = tileHeight;
-      this.scaleVec[2] = 1;
-      mat4.scale(this.tileModelMatrix, this.tileModelMatrix, this.scaleVec);
+      // Pack data: position (2) + size (2) + frame (4) + tint (4) = 12 floats
+      this.instanceData[offset + 0] = worldPosX;
+      this.instanceData[offset + 1] = worldPosY;
+      this.instanceData[offset + 2] = worldSizeX;
+      this.instanceData[offset + 3] = worldSizeY;
 
-      // Calculate MVP using gl-matrix (reusing buffer)
-      mat4.multiply(
-        this.mvpMatrix,
-        vpMatrix as Float32Array,
-        this.tileModelMatrix
-      );
-
-      // Pack data: MVP (16) + frame (4) + tint (4)
-      this.instanceData.set(this.mvpMatrix, offset);
-      this.instanceData.set(tileInstance.tile.frame.data, offset + 16);
-      this.instanceData.set(tileInstance.tint.data, offset + 20);
+      // Frame and tint
+      this.instanceData.set(tileInstance.tile.frame.data, offset + 4);
+      this.instanceData.set(tileInstance.tint.data, offset + 8);
 
       offset += TileMapBatch.FLOATS_PER_INSTANCE;
     }
@@ -181,11 +181,21 @@ export class TileMapBatch {
       this.instanceBuffer = this.device.createBuffer({
         size: bufferSize,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        label: `TileMap Instance Buffer (TileSet ${this.tileSet.id})`,
+        label: `TileMap Instance Buffer (TileSet ${this.tileSet.id}) - Batch ${this.bufferId}`,
       });
+
+      // Note: bufferId is set once in constructor and never changes
+      // Each batch has a globally unique ID for bind group caching
     }
 
     return this.instanceBuffer;
+  }
+
+  /**
+   * Get unique buffer ID for bind group caching
+   */
+  getBufferId(): number {
+    return this.bufferId;
   }
 
   /**

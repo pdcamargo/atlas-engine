@@ -1,18 +1,24 @@
 // Instanced sprite shader - renders multiple sprites in one draw call
 // Each sprite's data is stored in a storage buffer and accessed via instance_index
+// MVP matrix is computed on GPU for better performance
 
 struct SpriteInstance {
-  // MVP matrix (16 floats)
-  mvpMatrix: mat4x4<f32>,
-  // Texture frame (x, y, width, height) in normalized coordinates
+  // World position (x, y) in world space (8 bytes)
+  position: vec2<f32>,
+  // Size (width, height) in world units (8 bytes)
+  size: vec2<f32>,
+  // Texture frame (x, y, width, height) in normalized coordinates (16 bytes)
   frame: vec4<f32>,
-  // Tint color (r, g, b, a)
+  // Tint color (r, g, b, a) (16 bytes)
   tint: vec4<f32>,
+  // Total: 48 bytes (was 96 bytes)
 }
 
-@group(0) @binding(0) var<storage, read> instances: array<SpriteInstance>;
-@group(0) @binding(1) var textureSampler: sampler;
-@group(0) @binding(2) var spriteTexture: texture_2d<f32>;
+// View-Projection matrix (shared across all instances)
+@group(0) @binding(0) var<uniform> viewProjectionMatrix: mat4x4<f32>;
+@group(0) @binding(1) var<storage, read> instances: array<SpriteInstance>;
+@group(0) @binding(2) var textureSampler: sampler;
+@group(0) @binding(3) var spriteTexture: texture_2d<f32>;
 
 struct VertexInput {
   @location(0) position: vec2f,
@@ -32,20 +38,25 @@ fn vertexMain(
   @builtin(instance_index) instanceIndex: u32
 ) -> VertexOutput {
   var output: VertexOutput;
-  
+
   // Get this instance's data
   let instance = instances[instanceIndex];
-  
-  // Transform vertex position
-  output.position = instance.mvpMatrix * vec4f(input.position, 0.0, 1.0);
-  
+
+  // Compute world position on GPU
+  // input.position is quad vertex in [0,1] range
+  // Scale by instance size and translate to instance position
+  let worldPos = instance.position + input.position * instance.size;
+
+  // Apply view-projection matrix
+  output.position = viewProjectionMatrix * vec4f(worldPos, 0.0, 1.0);
+
   // Map UV coordinates to the sprite's frame
   // input.texcoord is 0-1, we need to map it to the frame region
   output.texcoord = instance.frame.xy + input.texcoord * instance.frame.zw;
-  
+
   // Pass tint color to fragment shader
   output.tint = instance.tint;
-  
+
   return output;
 }
 

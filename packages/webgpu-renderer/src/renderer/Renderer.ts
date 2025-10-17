@@ -13,6 +13,7 @@ import { ObjectPool } from "@atlas/core";
 import { RenderBatch } from "../batching";
 import { TileMap } from "./tilemap/TileMap";
 import { TileMapBatch } from "./tilemap/TileMapBatch";
+import { LRUCache } from "../utils/LRUCache";
 
 interface RendererOptions {
   canvas?: HTMLCanvasElement;
@@ -49,6 +50,9 @@ export class WebgpuRenderer {
   // Cache texture views to avoid creating them every frame
   private textureViewCache = new Map<string, GPUTextureView>();
 
+  // Cache bind groups to avoid creating them every frame (LRU eviction)
+  private bindGroupCache = new LRUCache<string, GPUBindGroup>(256);
+
   // Cache bind group layouts (created once, reused)
   private spriteBindGroupLayout?: GPUBindGroupLayout;
   private spriteInstancedBindGroupLayout?: GPUBindGroupLayout;
@@ -70,6 +74,9 @@ export class WebgpuRenderer {
     indexBuffer?: GPUBuffer;
     indexFormat?: GPUIndexFormat;
   };
+
+  // VP matrix uniform buffer for instanced rendering
+  private vpMatrixBuffer?: GPUBuffer;
 
   // Performance tracking
   private drawCallCount: number = 0;
@@ -197,6 +204,16 @@ export class WebgpuRenderer {
       );
       this.squareUniformBufferPool.prewarm(50);
     }
+
+    // Create VP matrix uniform buffer (64 bytes for mat4x4<f32>)
+    this.vpMatrixBuffer = this.device.createBuffer({
+      size: 64, // 16 floats * 4 bytes
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      label: "VP Matrix Uniform Buffer",
+    });
+
+    // Clear bind group cache (important when shaders change)
+    this.bindGroupCache.clear();
 
     // Cache bind group layouts for reuse
     this.spriteBindGroupLayout = this.spritePipeline.getBindGroupLayout(0);
@@ -495,7 +512,7 @@ export class WebgpuRenderer {
     batch: RenderBatch,
     camera: Camera
   ): void {
-    if (!this.spriteInstancedBindGroupLayout) {
+    if (!this.spriteInstancedBindGroupLayout || !this.vpMatrixBuffer) {
       throw new Error("Instanced pipeline not initialized");
     }
 
@@ -505,25 +522,32 @@ export class WebgpuRenderer {
     const instanceDataInfo = batch.getInstanceData();
     if (instanceDataInfo.count === 0) return;
 
+    // Upload VP matrix to GPU (once per batch)
+    const vpMatrix = camera.getViewProjectionMatrix();
+    this.device.queue.writeBuffer(
+      this.vpMatrixBuffer,
+      0,
+      vpMatrix.data as Float32Array
+    );
+
     // Get or create instance buffer
     const instanceBuffer = batch.getOrCreateInstanceBuffer();
 
-    // Write instance data to GPU
-    this.device.queue.writeBuffer(
-      instanceBuffer,
+    // Write instance data to GPU (48 bytes per instance = 12 floats)
+    const instanceDataToWrite = instanceDataInfo.data.subarray(
       0,
-      instanceDataInfo.data.buffer,
-      0,
-      instanceDataInfo.count * 96 // 96 bytes per instance
+      instanceDataInfo.count * 12
     );
+    this.device.queue.writeBuffer(instanceBuffer, 0, instanceDataToWrite);
 
-    // Create bind group
+    // Create bind group with 4 bindings
     const bindGroup = this.device.createBindGroup({
       layout: this.spriteInstancedBindGroupLayout,
       entries: [
-        { binding: 0, resource: { buffer: instanceBuffer } },
-        { binding: 1, resource: batch.texture.sampler },
-        { binding: 2, resource: this.getOrCreateTextureView(batch.texture) },
+        { binding: 0, resource: { buffer: this.vpMatrixBuffer } }, // VP matrix uniform
+        { binding: 1, resource: { buffer: instanceBuffer } }, // Instance data storage
+        { binding: 2, resource: batch.texture.sampler }, // Texture sampler
+        { binding: 3, resource: this.getOrCreateTextureView(batch.texture) }, // Texture view
       ],
     });
 
@@ -864,6 +888,15 @@ export class WebgpuRenderer {
     // Get world matrix for rendering
     const worldMatrix = tileMap.getWorldMatrix();
 
+    // Upload VP matrix to GPU (once per tilemap)
+    if (this.vpMatrixBuffer) {
+      this.device.queue.writeBuffer(
+        this.vpMatrixBuffer,
+        0,
+        vpMatrix as Float32Array
+      );
+    }
+
     // Count total tiles
     for (const chunk of tileMap.getChunks().values()) {
       this.totalTiles += chunk.getTileCount();
@@ -884,7 +917,9 @@ export class WebgpuRenderer {
         this.spriteInstancedPipeline,
         this.spriteInstancedBindGroupLayout,
         this.quadBuffers,
-        this.textureViewCache
+        this.textureViewCache,
+        this.bindGroupCache,
+        this.vpMatrixBuffer!
       );
 
       // Track stats

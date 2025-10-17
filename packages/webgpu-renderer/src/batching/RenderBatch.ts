@@ -22,9 +22,9 @@ export class RenderBatch {
   // Threshold for when to use instancing vs individual draws
   private static readonly INSTANCING_THRESHOLD = 1;
 
-  // Bytes per sprite instance: 16 floats (matrix) + 4 floats (frame) + 4 floats (tint) = 24 floats = 96 bytes
-  private static readonly BYTES_PER_INSTANCE = 96;
-  private static readonly FLOATS_PER_INSTANCE = 24;
+  // Bytes per sprite instance: 2 floats (position) + 2 floats (size) + 4 floats (frame) + 4 floats (tint) = 12 floats = 48 bytes
+  private static readonly BYTES_PER_INSTANCE = 48;
+  private static readonly FLOATS_PER_INSTANCE = 12;
 
   // Frustum culling can be expensive for many sprites - make it optional
   public enableFrustumCulling: boolean = false;
@@ -154,29 +154,34 @@ export class RenderBatch {
     }
 
     // Pack instance data for each visible sprite
-    const vpMatrix = camera.getViewProjectionMatrix();
     let offset = 0;
 
     for (const sprite of visibleSprites) {
-      // Calculate MVP matrix
+      // Get world transform
       const modelMatrix = sprite.getWorldMatrix();
 
-      // Create scaled model matrix (we'll use a temporary matrix)
-      const scaledModel = new Float32Array(16);
-      for (let i = 0; i < 16; i++) {
-        scaledModel[i] = modelMatrix[i];
-      }
-      scaledModel[0] *= sprite.width;
-      scaledModel[5] *= sprite.height;
+      // Extract world position (x, y) from model matrix
+      const worldX = modelMatrix[12];
+      const worldY = modelMatrix[13];
 
-      // Calculate MVP
-      const mvp = new Float32Array(16);
-      this.multiplyMatrices(mvp, vpMatrix.data, scaledModel);
+      // Extract scale from model matrix and apply sprite dimensions
+      const scaleX = Math.sqrt(
+        modelMatrix[0] * modelMatrix[0] + modelMatrix[1] * modelMatrix[1]
+      );
+      const scaleY = Math.sqrt(
+        modelMatrix[4] * modelMatrix[4] + modelMatrix[5] * modelMatrix[5]
+      );
 
-      // Pack data: MVP (16) + frame (4) + tint (4)
-      this.instanceData.set(mvp, offset);
-      this.instanceData.set(sprite.frame.data, offset + 16);
-      this.instanceData.set(sprite.tint.data, offset + 20);
+      const worldSizeX = sprite.width * scaleX;
+      const worldSizeY = sprite.height * scaleY;
+
+      // Pack data: position (2) + size (2) + frame (4) + tint (4) = 12 floats
+      this.instanceData[offset + 0] = worldX;
+      this.instanceData[offset + 1] = worldY;
+      this.instanceData[offset + 2] = worldSizeX;
+      this.instanceData[offset + 3] = worldSizeY;
+      this.instanceData.set(sprite.frame.data, offset + 4);
+      this.instanceData.set(sprite.tint.data, offset + 8);
 
       offset += RenderBatch.FLOATS_PER_INSTANCE;
     }
@@ -244,68 +249,5 @@ export class RenderBatch {
       this.instanceBuffer.destroy();
       this.instanceBuffer = undefined;
     }
-  }
-
-  /**
-   * Helper: Multiply two 4x4 matrices
-   */
-  private multiplyMatrices(
-    out: Float32Array,
-    a: Float32Array | Mat4,
-    b: Float32Array
-  ): void {
-    const a00 = a[0],
-      a01 = a[1],
-      a02 = a[2],
-      a03 = a[3];
-    const a10 = a[4],
-      a11 = a[5],
-      a12 = a[6],
-      a13 = a[7];
-    const a20 = a[8],
-      a21 = a[9],
-      a22 = a[10],
-      a23 = a[11];
-    const a30 = a[12],
-      a31 = a[13],
-      a32 = a[14],
-      a33 = a[15];
-
-    const b00 = b[0],
-      b01 = b[1],
-      b02 = b[2],
-      b03 = b[3];
-    const b10 = b[4],
-      b11 = b[5],
-      b12 = b[6],
-      b13 = b[7];
-    const b20 = b[8],
-      b21 = b[9],
-      b22 = b[10],
-      b23 = b[11];
-    const b30 = b[12],
-      b31 = b[13],
-      b32 = b[14],
-      b33 = b[15];
-
-    out[0] = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
-    out[1] = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
-    out[2] = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
-    out[3] = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
-
-    out[4] = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
-    out[5] = a10 * b01 + a11 * b11 + a12 * b21 + a13 * b31;
-    out[6] = a10 * b02 + a11 * b12 + a12 * b22 + a13 * b32;
-    out[7] = a10 * b03 + a11 * b13 + a12 * b23 + a13 * b33;
-
-    out[8] = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
-    out[9] = a20 * b01 + a21 * b11 + a22 * b21 + a23 * b31;
-    out[10] = a20 * b02 + a21 * b12 + a22 * b22 + a23 * b32;
-    out[11] = a20 * b03 + a21 * b13 + a22 * b23 + a23 * b33;
-
-    out[12] = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;
-    out[13] = a30 * b01 + a31 * b11 + a32 * b21 + a33 * b31;
-    out[14] = a30 * b02 + a31 * b12 + a32 * b22 + a33 * b32;
-    out[15] = a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33;
   }
 }

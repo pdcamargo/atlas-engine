@@ -16,12 +16,14 @@ export abstract class Camera {
   protected _viewProjectionMatrix: Mat4 = new Mat4();
   protected _viewDirty: boolean = true;
   protected _projectionDirty: boolean = true;
+  protected _viewProjectionDirty: boolean = true;
 
   /**
    * Mark view matrix as dirty
    */
   markViewDirty(): void {
     this._viewDirty = true;
+    this._viewProjectionDirty = true;
   }
 
   /**
@@ -29,6 +31,7 @@ export abstract class Camera {
    */
   markProjectionDirty(): void {
     this._projectionDirty = true;
+    this._viewProjectionDirty = true;
   }
 
   /**
@@ -88,12 +91,15 @@ export abstract class Camera {
   }
 
   /**
-   * Get the combined view-projection matrix
+   * Get the combined view-projection matrix (cached)
    */
   getViewProjectionMatrix(): Mat4 {
-    const view = this.getViewMatrix();
-    const projection = this.getProjectionMatrix();
-    mat4.multiply(this._viewProjectionMatrix.data, projection.data, view.data);
+    if (this._viewProjectionDirty) {
+      const view = this.getViewMatrix();
+      const projection = this.getProjectionMatrix();
+      mat4.multiply(this._viewProjectionMatrix.data, projection.data, view.data);
+      this._viewProjectionDirty = false;
+    }
     return this._viewProjectionMatrix;
   }
 
