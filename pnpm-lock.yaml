@@ -128,9 +128,6 @@ importers:
       '@atlas/core':
         specifier: workspace:*
         version: link:../core
-      '@atlas/renderer-2d':
-        specifier: workspace:*
-        version: link:../renderer-2d
       '@atlas/webgpu-renderer':
         specifier: workspace:*
         version: link:../webgpu-renderer
@@ -168,37 +165,6 @@ importers:
       eslint-config-prettier:
         specifier: ^9.1.0
         version: 9.1.2(eslint@8.57.1)
-
-  packages/renderer-2d:
-    dependencies:
-      '@atlas/core':
-        specifier: workspace:*
-        version: link:../core
-      gl-matrix:
-        specifier: 4.0.0-beta.2
-        version: 4.0.0-beta.2
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
-    devDependencies:
-      '@repo/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@repo/utils':
-        specifier: workspace:*
-        version: link:../utils
-      '@webgpu/types':
-        specifier: ^0.1.64
-        version: 0.1.65
-      eslint:
-        specifier: ^8.57.0
-        version: 8.57.1
-      typescript:
-        specifier: 5.5.4
-        version: 5.5.4
 
   packages/template:
     dependencies:

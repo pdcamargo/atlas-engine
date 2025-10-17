@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@atlas/core": "workspace:*",
-    "@atlas/renderer-2d": "workspace:*",
     "@atlas/webgpu-renderer": "workspace:*",
     "@atlas/audio": "workspace:*",
     "reflect-metadata": "^0.2.2"
