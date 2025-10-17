@@ -1,4 +1,5 @@
 import { createTextureFromImage, createTextureFromSource } from "webgpu-utils";
+import type { Handle, ImageAsset } from "@atlas/core";
 
 const uuidv4 = () => {
   return crypto.randomUUID();
@@ -14,13 +15,22 @@ export class Texture {
   public width: number;
   public height: number;
 
-  private constructor(texture: GPUTexture, sampler: GPUSampler, id?: string) {
+  /** Optional handle to source asset for hot-reload support */
+  public sourceHandle?: Handle<ImageAsset>;
+
+  private constructor(
+    texture: GPUTexture,
+    sampler: GPUSampler,
+    id?: string,
+    sourceHandle?: Handle<ImageAsset>
+  ) {
     this.id = id ?? uuidv4();
 
     this.gpuTexture = texture;
     this.sampler = sampler;
     this.width = texture.width;
     this.height = texture.height;
+    this.sourceHandle = sourceHandle;
   }
 
   /**
@@ -80,6 +90,7 @@ export class Texture {
       addressModeV?: GPUAddressMode;
       magFilter?: GPUFilterMode;
       minFilter?: GPUFilterMode;
+      sourceHandle?: Handle<ImageAsset>;
     }
   ): Texture {
     const {
@@ -89,6 +100,7 @@ export class Texture {
       addressModeV = "repeat",
       magFilter = "linear",
       minFilter = "linear",
+      sourceHandle,
     } = options || {};
 
     const texture = createTextureFromSource(device, source, {
@@ -104,7 +116,7 @@ export class Texture {
       mipmapFilter: mips ? "linear" : "nearest",
     });
 
-    return new Texture(texture, sampler);
+    return new Texture(texture, sampler, undefined, sourceHandle);
   }
 
   /**

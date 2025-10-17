@@ -6,8 +6,12 @@ import { GpuCanvasContext } from "./resources/canvas-context";
 import { WebgpuRenderer } from "../renderer/Renderer";
 import { resize } from "./systems/resize";
 import { render } from "./systems/render";
+import { textureLoadingSystem } from "./systems/texture-loading";
+import { tileSetLoadingSystem } from "./systems/tileset-loading";
+import { TextureCache } from "./resources/texture-cache";
 
 const ResizeSystem = Symbol("WebgpuRenderer::PreUpdate");
+const LoadingSystem = Symbol("WebgpuRenderer::TextureLoading");
 const RenderSystem = Symbol("WebgpuRenderer::Render");
 
 export type WebgpuRendererPluginOptions = {
@@ -26,10 +30,15 @@ export class WebgpuRendererPlugin implements EcsPlugin {
 
     app
       .setResource(renderer)
+      .setResource(new TextureCache())
       .setResource(new GpuRenderDevice(renderer.gpu.device))
       .setResource(new GpuPresentationFormat(renderer.gpu.format))
       .setResource(new GpuCanvasContext(renderer.gpu.context))
       .addSystems(SystemType.PreUpdate, createSet(ResizeSystem, resize))
+      .addSystems(
+        SystemType.PreUpdate,
+        createSet(LoadingSystem, textureLoadingSystem, tileSetLoadingSystem)
+      )
       .addSystems(SystemType.Render, createSet(RenderSystem, render));
   }
 

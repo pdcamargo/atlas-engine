@@ -1,6 +1,6 @@
 import { Texture } from "../Texture";
 import { Tile } from "./Tile";
-import { Rect } from "@atlas/core";
+import { Rect, Handle, ImageAsset } from "@atlas/core";
 
 export interface TileSetOptions {
   spacing?: number; // Spacing between tiles in pixels
@@ -10,9 +10,10 @@ export interface TileSetOptions {
 /**
  * TileSet manages a texture and its tile definitions
  * Multiple tiles can reference different regions of the same texture
+ * Supports both pre-loaded Textures and lazy-loaded Handles
  */
 export class TileSet {
-  public readonly texture: Texture;
+  public texture: Texture | Handle<ImageAsset>;
   public readonly tileWidth: number;
   public readonly tileHeight: number;
   public readonly id: string;
@@ -21,7 +22,7 @@ export class TileSet {
   private options: TileSetOptions;
 
   constructor(
-    texture: Texture,
+    texture: Texture | Handle<ImageAsset>,
     tileWidth: number,
     tileHeight: number,
     options: TileSetOptions = {}
@@ -29,11 +30,28 @@ export class TileSet {
     this.texture = texture;
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
-    this.id = texture.id;
+    // Use texture ID if available, otherwise use handle ID
+    this.id = texture instanceof Texture ? texture.id : texture.id.toString();
     this.options = {
       spacing: options.spacing ?? 0,
       margin: options.margin ?? 0,
     };
+  }
+
+  /**
+   * Get the loaded Texture (returns null if texture is a Handle or not loaded)
+   */
+  getTexture(): Texture | null {
+    return this.texture instanceof Texture ? this.texture : null;
+  }
+
+  /**
+   * Get the Handle if texture is still loading (returns null if already a Texture)
+   */
+  getHandle(): Handle<ImageAsset> | null {
+    return !(this.texture instanceof Texture)
+      ? (this.texture as Handle<ImageAsset>)
+      : null;
   }
 
   /**
@@ -60,14 +78,18 @@ export class TileSet {
     height: number,
     metadata?: Record<string, any>
   ): Tile {
+    const texture = this.getTexture();
+    if (!texture) {
+      throw new Error("Cannot add tile from pixels: texture not loaded yet");
+    }
     const tile = Tile.fromPixels(
       id,
       x,
       y,
       width,
       height,
-      this.texture.width,
-      this.texture.height,
+      texture.width,
+      texture.height,
       metadata
     );
     this.tiles.set(id, tile);

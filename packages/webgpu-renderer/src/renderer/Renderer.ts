@@ -369,9 +369,16 @@ export class WebgpuRenderer {
     // Collect all sprites from scene graph
     sceneGraph.traverse((node) => {
       if (node instanceof Sprite && node.texture) {
+        // Only add sprites with loaded Textures (skip handles that haven't loaded yet)
+        const texture = node.getTexture();
+        if (!texture) {
+          // Texture is still a handle or not loaded, skip for now
+          return;
+        }
+
         currentSprites.add(node);
 
-        const textureId = node.texture.id;
+        const textureId = texture.id;
         if (!spritesByTexture.has(textureId)) {
           spritesByTexture.set(textureId, new Set());
         }
@@ -411,9 +418,10 @@ export class WebgpuRenderer {
       if (!batch) {
         // Create new batch
         const firstSprite = sprites.values().next().value;
-        if (!firstSprite || !firstSprite.texture) continue;
+        const texture = firstSprite?.getTexture();
+        if (!firstSprite || !texture) continue;
 
-        batch = new RenderBatch(firstSprite.texture);
+        batch = new RenderBatch(texture);
         batch.initialize(this.device);
         this.batches.set(textureId, batch);
       }
@@ -639,7 +647,7 @@ export class WebgpuRenderer {
     sprite: Sprite,
     vpMatrix: Mat4
   ): void {
-    if (!sprite.texture) return;
+    if (!sprite.texture || !(sprite.texture instanceof Texture)) return;
 
     // Compute MVP matrix using pooled matrices
     const modelMatrix = sprite.getWorldMatrix();

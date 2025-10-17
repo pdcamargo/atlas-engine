@@ -1,19 +1,20 @@
 import { SceneNode } from "./SceneNode";
 import { Texture } from "./Texture";
-import { Rect, Color } from "@atlas/core";
+import { Rect, Color, Handle, ImageAsset } from "@atlas/core";
 
 /**
  * Sprite class for rendering textured quads
+ * Supports both pre-loaded Textures and lazy-loaded Handles
  */
 export class Sprite extends SceneNode {
-  public texture: Texture | null = null;
+  public texture: Texture | Handle<ImageAsset> | null = null;
   public width: number;
   public height: number;
   public frame: Rect;
   public tint: Color;
 
   constructor(
-    texture: Texture | null = null,
+    texture: Texture | Handle<ImageAsset> | null = null,
     width: number = 1,
     height: number = 1,
     id?: string
@@ -30,8 +31,24 @@ export class Sprite extends SceneNode {
   /**
    * Set the texture for this sprite
    */
-  setTexture(texture: Texture): void {
+  setTexture(texture: Texture | Handle<ImageAsset>): void {
     this.texture = texture;
+  }
+
+  /**
+   * Get the loaded Texture (returns null if texture is a Handle or not loaded)
+   */
+  getTexture(): Texture | null {
+    return this.texture instanceof Texture ? this.texture : null;
+  }
+
+  /**
+   * Get the Handle if texture is still loading (returns null if already a Texture)
+   */
+  getHandle(): Handle<ImageAsset> | null {
+    return this.texture && !(this.texture instanceof Texture)
+      ? (this.texture as Handle<ImageAsset>)
+      : null;
   }
 
   /**

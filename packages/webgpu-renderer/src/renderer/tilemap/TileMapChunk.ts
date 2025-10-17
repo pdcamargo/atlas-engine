@@ -181,6 +181,13 @@ export class TileMapChunk {
     for (const batch of this.batches.values()) {
       if (batch.isEmpty()) continue;
 
+      // Check if tileset texture is loaded (skip if still a handle)
+      const texture = batch.tileSet.getTexture();
+      if (!texture) {
+        // Texture not loaded yet, skip this batch
+        continue;
+      }
+
       // Rebuild batch if needed
       batch.rebuild(vpMatrix, worldMatrix, tileWidth, tileHeight);
 
@@ -200,14 +207,14 @@ export class TileMapChunk {
       );
 
       // Get or create texture view
-      let textureView = textureViewCache.get(batch.tileSet.texture.id);
+      let textureView = textureViewCache.get(texture.id);
       if (!textureView) {
-        textureView = batch.tileSet.texture.gpuTexture.createView();
-        textureViewCache.set(batch.tileSet.texture.id, textureView);
+        textureView = texture.gpuTexture.createView();
+        textureViewCache.set(texture.id, textureView);
       }
 
       // Create bind group key (textureId + bufferId)
-      const bindGroupKey = `${batch.tileSet.texture.id}_${batch.getBufferId()}`;
+      const bindGroupKey = `${texture.id}_${batch.getBufferId()}`;
 
       // Get or create bind group using cache
       const bindGroup = bindGroupCache.getOrCreate(bindGroupKey, () => {
@@ -216,7 +223,7 @@ export class TileMapChunk {
           entries: [
             { binding: 0, resource: { buffer: vpMatrixBuffer } }, // VP matrix uniform
             { binding: 1, resource: { buffer: instanceBuffer } }, // Instance data storage
-            { binding: 2, resource: batch.tileSet.texture.sampler },
+            { binding: 2, resource: texture.sampler },
             { binding: 3, resource: textureView },
           ],
         });
