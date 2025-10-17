@@ -7,6 +7,12 @@ export interface TileSetOptions {
   margin?: number; // Margin around the tileset in pixels
 }
 
+interface PendingTileGrid {
+  columns: number;
+  rows: number;
+  startId: number;
+}
+
 /**
  * TileSet manages a texture and its tile definitions
  * Multiple tiles can reference different regions of the same texture
@@ -20,6 +26,7 @@ export class TileSet {
 
   private tiles: Map<number | string, Tile> = new Map();
   private options: TileSetOptions;
+  private pendingTileGrids: PendingTileGrid[] = [];
 
   constructor(
     texture: Texture | Handle<ImageAsset>,
@@ -52,6 +59,13 @@ export class TileSet {
     return !(this.texture instanceof Texture)
       ? (this.texture as Handle<ImageAsset>)
       : null;
+  }
+
+  /**
+   * Check if the texture is ready (loaded and available)
+   */
+  isTextureReady(): boolean {
+    return this.texture instanceof Texture;
   }
 
   /**
@@ -99,11 +113,27 @@ export class TileSet {
   /**
    * Auto-generate tiles from a grid layout
    * Tiles are numbered sequentially from left to right, top to bottom
+   * If texture is not ready, the grid creation is deferred until texture loads
    * @param columns Number of columns in the grid
    * @param rows Number of rows in the grid
    * @param startId Starting ID for tiles (default: 0)
    */
   addTilesFromGrid(columns: number, rows: number, startId: number = 0): Tile[] {
+    // Check if texture is ready
+    if (!this.isTextureReady()) {
+      // Defer grid creation until texture loads
+      this.pendingTileGrids.push({ columns, rows, startId });
+      return [];
+    }
+
+    // Texture is ready, create tiles immediately
+    return this.createTileGrid(columns, rows, startId);
+  }
+
+  /**
+   * Internal method to create tiles from a grid
+   */
+  private createTileGrid(columns: number, rows: number, startId: number): Tile[] {
     const tiles: Tile[] = [];
     const { spacing, margin } = this.options;
 
@@ -175,5 +205,34 @@ export class TileSet {
    */
   clear(): void {
     this.tiles.clear();
+  }
+
+  /**
+   * Sync pending tile grids that were deferred until texture loads
+   * This is called automatically by the tileset loading system
+   * Returns the number of grids that were created
+   */
+  syncPendingTileGrids(): number {
+    if (this.pendingTileGrids.length === 0 || !this.isTextureReady()) {
+      return 0;
+    }
+
+    let createdCount = 0;
+    for (const grid of this.pendingTileGrids) {
+      this.createTileGrid(grid.columns, grid.rows, grid.startId);
+      createdCount++;
+    }
+
+    // Clear pending grids
+    this.pendingTileGrids = [];
+
+    return createdCount;
+  }
+
+  /**
+   * Get the number of pending tile grids waiting for texture to load
+   */
+  getPendingTileGridCount(): number {
+    return this.pendingTileGrids.length;
   }
 }

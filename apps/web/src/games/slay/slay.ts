@@ -81,10 +81,18 @@ export class SlayGamePlugin implements EcsPlugin {
 
         const tileSet = new TileSet(tilemapHandle, 16, 16);
 
+        tileSet.addTilesFromGrid(13, 21);
+
         tilemap.setScale({ x: 0.005, y: 0.005 });
-        tilemap.setPosition({ x: -5, y: 5 });
+        tilemap.setPosition({ x: -1, y: -1 });
 
         const layer = tilemap.addLayer("default");
+
+        for (let i = 0; i < 2048; i++) {
+          for (let j = 0; j < 2048; j++) {
+            layer.setTileById(i, j, tileSet, 0);
+          }
+        }
 
         // // Add tiles - they won't render until texture loads, but that's okay!
         // // We need to wait for texture to load before calling addTilesFromGrid
@@ -167,6 +175,44 @@ export class SlayGamePlugin implements EcsPlugin {
         );
 
         commands.spawn(new AudioListener());
+      })
+      .addUpdateSystems(({ commands }) => {
+        const [, camera] = commands
+          .query(OrthographicCamera, MainCamera)
+          .find();
+        const input = commands.getResource(Input);
+        const time = commands.getResource(Time);
+
+        const cameraSpeed = 5;
+
+        const cameraMove = cameraSpeed * time.deltaTime;
+
+        if (input.pressed(KeyCode.ArrowLeft)) {
+          camera.position.x -= cameraMove;
+          camera.target.x -= cameraMove;
+
+          camera.markViewDirty();
+        }
+        if (input.pressed(KeyCode.ArrowRight)) {
+          camera.position.x += cameraMove;
+          camera.target.x += cameraMove;
+
+          camera.markViewDirty();
+        }
+        if (input.pressed(KeyCode.ArrowUp)) {
+          camera.position.y += cameraMove;
+          camera.target.y += cameraMove;
+
+          camera.markViewDirty();
+        }
+        if (input.pressed(KeyCode.ArrowDown)) {
+          camera.position.y -= cameraMove;
+          camera.target.y -= cameraMove;
+
+          camera.markViewDirty();
+        }
+
+        camera.markViewDirty();
       });
   }
 }

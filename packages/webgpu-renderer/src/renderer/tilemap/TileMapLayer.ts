@@ -8,6 +8,14 @@ export interface TileData {
   tint?: Color;
 }
 
+export interface PendingTileData {
+  x: number;
+  y: number;
+  tileSet: TileSet;
+  tile: Tile | number | string; // Can be a Tile instance or a tile ID (for deferred lookup)
+  tint?: Color;
+}
+
 export interface LayerBounds {
   minX: number;
   minY: number;
@@ -26,6 +34,7 @@ export class TileMapLayer {
   public zIndex: number = 0; // For layer ordering
 
   private tiles: Map<string, TileData> = new Map();
+  private pendingTiles: PendingTileData[] = [];
   private onDirtyCallback?: () => void;
 
   constructor(name: string, onDirtyCallback?: () => void) {
@@ -50,17 +59,63 @@ export class TileMapLayer {
 
   /**
    * Set a tile at a specific position
+   * If the tileset texture is not ready or tile is undefined, the tile is queued for later application
    */
   setTile(
     x: number,
     y: number,
     tileSet: TileSet,
-    tile: Tile,
+    tile: Tile | number | string | undefined,
     tint?: Color
   ): void {
+    // If tile is undefined, warn and skip
+    if (tile === undefined) {
+      console.warn(
+        `[TileMapLayer] Tile is undefined for position (${x}, ${y}). This usually means the tileset texture hasn't loaded yet and tiles haven't been created. Consider using setTileById() instead.`
+      );
+      return;
+    }
+
+    // If tile is an ID (number or string), defer until tileset is ready
+    if (typeof tile === "number" || typeof tile === "string") {
+      this.setTileById(x, y, tileSet, tile, tint);
+      return;
+    }
+
+    // Check if texture is ready
+    if (!tileSet.isTextureReady()) {
+      // Queue for later application
+      this.pendingTiles.push({ x, y, tileSet, tile, tint });
+      return;
+    }
+
+    // Texture is ready, apply immediately
     const key = this.getKey(x, y);
     this.tiles.set(key, { tileSet, tile, tint });
     this.markDirty();
+  }
+
+  /**
+   * Set a tile by its ID (defers lookup until texture is loaded)
+   * This is useful when tiles haven't been created yet from addTilesFromGrid
+   */
+  setTileById(
+    x: number,
+    y: number,
+    tileSet: TileSet,
+    tileId: number | string,
+    tint?: Color
+  ): void {
+    // Try to get the tile now
+    const tile = tileSet.getTile(tileId);
+
+    if (tile) {
+      // Tile exists, use normal setTile
+      this.setTile(x, y, tileSet, tile, tint);
+    } else {
+      // Tile doesn't exist yet (likely deferred), queue with ID
+      this.pendingTiles.push({ x, y, tileSet, tile: tileId, tint });
+    }
   }
 
   /**
@@ -169,5 +224,83 @@ export class TileMapLayer {
       this.visible = visible;
       this.markDirty();
     }
+  }
+
+  /**
+   * Sync pending tiles whose textures are now ready
+   * Returns the number of tiles that were applied
+   */
+  syncPendingTiles(): number {
+    if (this.pendingTiles.length === 0) {
+      return 0;
+    }
+
+    let appliedCount = 0;
+    const stillPending: PendingTileData[] = [];
+
+    for (const pendingTile of this.pendingTiles) {
+      if (pendingTile.tileSet.isTextureReady()) {
+        // Resolve tile if it's an ID
+        let tile: Tile | undefined;
+        if (typeof pendingTile.tile === "number" || typeof pendingTile.tile === "string") {
+          tile = pendingTile.tileSet.getTile(pendingTile.tile);
+          if (!tile) {
+            // Tile still doesn't exist, keep pending
+            stillPending.push(pendingTile);
+            continue;
+          }
+        } else {
+          tile = pendingTile.tile;
+        }
+
+        // Texture is ready and tile is resolved, apply the tile
+        const key = this.getKey(pendingTile.x, pendingTile.y);
+        this.tiles.set(key, {
+          tileSet: pendingTile.tileSet,
+          tile: tile,
+          tint: pendingTile.tint,
+        });
+        appliedCount++;
+      } else {
+        // Still not ready, keep in pending queue
+        stillPending.push(pendingTile);
+      }
+    }
+
+    // Update pending tiles array
+    this.pendingTiles = stillPending;
+
+    // Mark dirty if we applied any tiles
+    if (appliedCount > 0) {
+      this.markDirty();
+    }
+
+    return appliedCount;
+  }
+
+  /**
+   * Get the number of pending tiles waiting for textures to load
+   */
+  getPendingTileCount(): number {
+    return this.pendingTiles.length;
+  }
+
+  /**
+   * Get all unique tilesets used in this layer (including pending tiles)
+   */
+  getAllTileSets(): Set<TileSet> {
+    const tileSets = new Set<TileSet>();
+
+    // Add tilesets from placed tiles
+    for (const data of this.tiles.values()) {
+      tileSets.add(data.tileSet);
+    }
+
+    // Add tilesets from pending tiles
+    for (const pendingTile of this.pendingTiles) {
+      tileSets.add(pendingTile.tileSet);
+    }
+
+    return tileSets;
   }
 }

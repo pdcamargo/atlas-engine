@@ -104,17 +104,33 @@ export class TileMap extends SceneNode {
 
   /**
    * Set a tile at a specific position in a layer (convenience method)
+   * Supports both Tile instances and tile IDs (for deferred loading)
    */
   setTile(
     x: number,
     y: number,
     layerName: string,
     tileSet: TileSet,
-    tile: Tile,
+    tile: Tile | number | string | undefined,
     tint?: Color
   ): void {
     const layer = this.ensureLayer(layerName);
     layer.setTile(x, y, tileSet, tile, tint);
+  }
+
+  /**
+   * Set a tile by its ID (convenience method for deferred loading)
+   */
+  setTileById(
+    x: number,
+    y: number,
+    layerName: string,
+    tileSet: TileSet,
+    tileId: number | string,
+    tint?: Color
+  ): void {
+    const layer = this.ensureLayer(layerName);
+    layer.setTileById(x, y, tileSet, tileId, tint);
   }
 
   /**
@@ -375,5 +391,48 @@ export class TileMap extends SceneNode {
     }
 
     return result;
+  }
+
+  /**
+   * Sync pending tiles across all layers whose textures are now ready
+   * This is called automatically by the tileset loading system when textures load
+   * Returns the total number of tiles that were applied
+   */
+  syncPendingTiles(): number {
+    let totalApplied = 0;
+
+    for (const layer of this.layers.values()) {
+      const appliedCount = layer.syncPendingTiles();
+      totalApplied += appliedCount;
+    }
+
+    return totalApplied;
+  }
+
+  /**
+   * Get the total number of pending tiles waiting for textures to load
+   */
+  getTotalPendingTileCount(): number {
+    let count = 0;
+    for (const layer of this.layers.values()) {
+      count += layer.getPendingTileCount();
+    }
+    return count;
+  }
+
+  /**
+   * Get all unique tilesets used in this tilemap (including from pending tiles)
+   */
+  getAllTileSets(): Set<TileSet> {
+    const tileSets = new Set<TileSet>();
+
+    for (const layer of this.layers.values()) {
+      const layerTileSets = layer.getAllTileSets();
+      for (const tileSet of layerTileSets) {
+        tileSets.add(tileSet);
+      }
+    }
+
+    return tileSets;
   }
 }

@@ -29,75 +29,83 @@ export const tileSetLoadingSystem = sys(({ commands }) => {
   for (const [entity, tileMap] of commands.query(unsynced).all()) {
     let allTileSetsLoaded = true;
 
-    // Check all layers and their tilesets
-    const layers = tileMap.getLayers();
+    // Get all unique tilesets (from placed tiles, pending tiles, and pending grids)
+    const allTileSets = tileMap.getAllTileSets();
 
-    for (const layer of layers) {
-      const allTiles = layer.getAllTiles();
-
-      // Track which tilesets we've already processed this frame
-      const processedTileSets = new Set<string>();
-
-      for (const { data } of allTiles) {
-        const tileSet = data.tileSet;
-
-        // Skip if already processed
-        if (processedTileSets.has(tileSet.id)) {
-          continue;
-        }
-        processedTileSets.add(tileSet.id);
-
-        // Skip if already a loaded Texture
-        if (tileSet.texture instanceof Texture) {
-          continue;
-        }
-
-        // At this point, tileSet.texture is a Handle<ImageAsset>
-        const handle = tileSet.getHandle();
-        if (!handle) {
-          continue;
-        }
-
-        // Check if the asset is loaded
-        const loadState = assetServer.getLoadState(handle);
-        if (loadState !== LoadState.Loaded) {
-          // Not loaded yet, mark that not all tilesets are ready
-          allTileSetsLoaded = false;
-          continue;
-        }
-
-        // Get the loaded asset
-        const imageAsset = assetServer.getAsset<ImageAsset>(handle);
-        if (!imageAsset || !imageAsset.image) {
-          console.warn(
-            `[TileSetLoading] ImageAsset loaded but has no image data`
-          );
-          allTileSetsLoaded = false;
-          continue;
-        }
-
-        // Check for TextureFilter component to customize texture creation
-        const textureFilter = commands.tryGetComponent(entity, TextureFilter);
-
-        const cachedTexture = textureCache.get(handle);
-        if (cachedTexture) {
-          tileSet.texture = cachedTexture;
-        } else {
-          const texture = Texture.fromSource(device, imageAsset.image, {
-            minFilter: textureFilter?.minFilter ?? "linear",
-            magFilter: textureFilter?.magFilter ?? "linear",
-            mips: textureFilter?.mips ?? true,
-            flipY: textureFilter?.flipY ?? true,
-            addressModeU: textureFilter?.addressModeU ?? "repeat",
-            addressModeV: textureFilter?.addressModeV ?? "repeat",
-            sourceHandle: handle, // Keep handle for hot-reload support
-          });
-          textureCache.set(handle, texture);
-          tileSet.texture = texture;
-        }
-
-        tileMap.markDirty();
+    for (const tileSet of allTileSets) {
+      // Check if tileset has pending grids (needs to be loaded)
+      const hasPendingGrids = tileSet.getPendingTileGridCount() > 0;
+      if (hasPendingGrids) {
+        // This tileset is needed but might not be loaded yet
+        allTileSetsLoaded = false;
       }
+
+      // Skip if already a loaded Texture
+      if (tileSet.texture instanceof Texture) {
+        continue;
+      }
+
+      // At this point, tileSet.texture is a Handle<ImageAsset>
+      const handle = tileSet.getHandle();
+      if (!handle) {
+        continue;
+      }
+
+      // Check if the asset is loaded
+      const loadState = assetServer.getLoadState(handle);
+      if (loadState !== LoadState.Loaded) {
+        // Not loaded yet, mark that not all tilesets are ready
+        allTileSetsLoaded = false;
+        continue;
+      }
+
+      // Get the loaded asset
+      const imageAsset = assetServer.getAsset<ImageAsset>(handle);
+      if (!imageAsset || !imageAsset.image) {
+        console.warn(
+          `[TileSetLoading] ImageAsset loaded but has no image data`
+        );
+        allTileSetsLoaded = false;
+        continue;
+      }
+
+      // Check for TextureFilter component to customize texture creation
+      const textureFilter = commands.tryGetComponent(entity, TextureFilter);
+
+      const cachedTexture = textureCache.get(handle);
+      if (cachedTexture) {
+        tileSet.texture = cachedTexture;
+      } else {
+        const texture = Texture.fromSource(device, imageAsset.image, {
+          minFilter: textureFilter?.minFilter ?? "linear",
+          magFilter: textureFilter?.magFilter ?? "linear",
+          mips: textureFilter?.mips ?? true,
+          flipY: textureFilter?.flipY ?? true,
+          addressModeU: textureFilter?.addressModeU ?? "repeat",
+          addressModeV: textureFilter?.addressModeV ?? "repeat",
+          sourceHandle: handle, // Keep handle for hot-reload support
+        });
+        textureCache.set(handle, texture);
+        tileSet.texture = texture;
+      }
+
+      // Sync any pending tile grids that were deferred
+      const syncedGrids = tileSet.syncPendingTileGrids();
+      if (syncedGrids > 0) {
+        console.log(
+          `[TileSetLoading] Created ${syncedGrids} pending tile grid(s) for tileset ${tileSet.id}`
+        );
+      }
+
+      // Sync any pending tiles that were waiting for this texture
+      const syncedCount = tileMap.syncPendingTiles();
+      if (syncedCount > 0) {
+        console.log(
+          `[TileSetLoading] Synced ${syncedCount} pending tiles for tileset ${tileSet.id}`
+        );
+      }
+
+      tileMap.markDirty();
     }
 
     // Only mark as synced if all tilesets are loaded
