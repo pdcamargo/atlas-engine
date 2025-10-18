@@ -25,6 +25,8 @@ import {
   KeyCode,
   Time,
   TextureFilter,
+  AnimatedSprite,
+  Animation,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
@@ -101,7 +103,7 @@ export class SlayGamePlugin implements EcsPlugin {
         sceneGraph.addRoot(tilemap);
         commands.spawn(tilemap, nearestFilter);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 0; i++) {
           const sprite = new Sprite(textureHandle, 0.5, 0.5);
           sprite.setTint(
             new Color(Math.random(), Math.random(), Math.random())
@@ -116,38 +118,58 @@ export class SlayGamePlugin implements EcsPlugin {
           sceneGraph.addRoot(sprite);
         }
 
-        const sprite2 = new Sprite(textureHandle2, 0.5, 0.5);
-        sprite2.setTint(new Color(Math.random(), Math.random(), Math.random()));
-        const frameIndex2 = 1;
-        sprite2.setFrame(new Rect(frameIndex2 * frameWidth, 0, frameWidth, 1));
-        sprite2.setPosition({
-          x: Math.random() - 0.5,
-          y: Math.random() - 0.5,
-        });
-        commands.spawn(sprite2, nearestFilter);
-        sceneGraph.addRoot(sprite2);
+        const animatedSprite = new AnimatedSprite(textureHandle, 0.5, 0.5);
 
-        const sprite3 = new Sprite(textureHandle3, 0.5, 0.5);
-        sprite3.setTint(new Color(Math.random(), Math.random(), Math.random()));
-        const frameIndex3 = 1;
-        sprite3.setFrame(new Rect(frameIndex3 * frameWidth, 0, frameWidth, 1));
-        sprite3.setPosition({
-          x: Math.random() - 0.5,
-          y: Math.random() - 0.5,
-        });
-        commands.spawn(sprite3, nearestFilter);
-        sceneGraph.addRoot(sprite3);
+        const getX = (index: number) => index * frameWidth;
+        const getY = (index: number) => 0;
 
-        const sprite4 = new Sprite(textureHandle4, 0.5, 0.5);
-        sprite4.setTint(new Color(Math.random(), Math.random(), Math.random()));
-        const frameIndex4 = 1;
-        sprite4.setFrame(new Rect(frameIndex4 * frameWidth, 0, frameWidth, 1));
-        sprite4.setPosition({
-          x: Math.random() - 0.5,
-          y: Math.random() - 0.5,
+        const runAnimation = new Animation({
+          frames: [
+            {
+              frame: new Rect(getX(0), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+            {
+              frame: new Rect(getX(1), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+            {
+              frame: new Rect(getX(2), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+            {
+              frame: new Rect(getX(3), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+            {
+              frame: new Rect(getX(4), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+            {
+              frame: new Rect(getX(5), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+            {
+              frame: new Rect(getX(6), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+            {
+              frame: new Rect(getX(7), getY(0), frameWidth, 1),
+              duration: 100,
+            },
+          ],
+          loop: true,
         });
-        commands.spawn(sprite4, nearestFilter);
-        sceneGraph.addRoot(sprite4);
+
+        animatedSprite.addAnimation("runDown", runAnimation);
+        animatedSprite.addAnimation("runUp", runAnimation);
+        animatedSprite.addAnimation("runRight", runAnimation);
+        animatedSprite.addAnimation("runLeft", runAnimation);
+
+        animatedSprite.play("runLeft");
+
+        commands.spawn(animatedSprite, nearestFilter);
+        sceneGraph.addRoot(animatedSprite);
 
         // Create camera
         const camera = new OrthographicCamera(-1, 1, -1, 1, 0.1, 100);

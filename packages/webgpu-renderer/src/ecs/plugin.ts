@@ -8,10 +8,12 @@ import { resize } from "./systems/resize";
 import { render } from "./systems/render";
 import { textureLoadingSystem } from "./systems/texture-loading";
 import { tileSetLoadingSystem } from "./systems/tileset-loading";
+import { animationUpdateSystem } from "./systems/animation-update";
 import { TextureCache } from "./resources/texture-cache";
 
 const ResizeSystem = Symbol("WebgpuRenderer::PreUpdate");
 const LoadingSystem = Symbol("WebgpuRenderer::TextureLoading");
+const AnimationSystem = Symbol("WebgpuRenderer::Animation");
 const RenderSystem = Symbol("WebgpuRenderer::Render");
 
 export type WebgpuRendererPluginOptions = {
@@ -38,6 +40,10 @@ export class WebgpuRendererPlugin implements EcsPlugin {
       .addSystems(
         SystemType.PreUpdate,
         createSet(LoadingSystem, textureLoadingSystem, tileSetLoadingSystem)
+      )
+      .addSystems(
+        SystemType.Update,
+        createSet(AnimationSystem, animationUpdateSystem)
       )
       .addSystems(SystemType.Render, createSet(RenderSystem, render));
   }

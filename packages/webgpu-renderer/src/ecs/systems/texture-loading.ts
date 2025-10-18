@@ -11,13 +11,16 @@ import { TextureFilter } from "../components/texture-filter";
 import { TextureSynced } from "../components/texture-synced";
 import { GpuRenderDevice } from "../resources";
 import { TextureCache } from "../resources/texture-cache";
+import { AnimatedSprite } from "../../renderer/AnimatedSprite";
 
 // Cache the marker instance to reuse across all entities
 const textureSyncedMarker = new TextureSynced();
 
 const unsynced = new QueryBuilder(Sprite).without(TextureSynced);
+const unsyncedAnimatedSprites = new QueryBuilder(AnimatedSprite).without(
+  TextureSynced
+);
 
-const textureFilterQuery = new QueryBuilder(Sprite, TextureFilter);
 /**
  * System that automatically creates Textures from loaded ImageAsset handles in Sprites
  *
@@ -31,29 +34,27 @@ export const textureLoadingSystem = sys(({ commands }) => {
 
   // Query only sprites that haven't been synced yet (optimization)
 
-  commands.query(unsynced).forEach((entity, sprite) => {
-    if (!sprite) {
-      return;
-    }
+  const animated = commands.query(unsyncedAnimatedSprites).all();
+  const normal = commands.query(unsynced).all();
 
-    if (sprite.texture instanceof Texture) {
-      commands.addComponent(entity, textureSyncedMarker);
-      return;
+  for (const [entity, sprite] of [...animated, ...normal]) {
+    if (!sprite) {
+      continue;
     }
 
     const handle = sprite.getHandle();
-    if (!handle) return;
+    if (!handle) continue;
 
     const loadState = assetServer.getLoadState(handle);
     if (loadState !== LoadState.Loaded) {
       // Not loaded yet, skip for now (will be checked again next frame)
-      return;
+      continue;
     }
 
     const imageAsset = assetServer.getAsset<ImageAsset>(handle);
     if (!imageAsset || !imageAsset.image) {
       console.warn(`[TextureLoading] ImageAsset loaded but has no image data`);
-      return;
+      continue;
     }
 
     const textureFilter = commands.tryGetComponent(entity, TextureFilter);
@@ -84,7 +85,7 @@ export const textureLoadingSystem = sys(({ commands }) => {
     }
 
     commands.addComponent(entity, textureSyncedMarker);
-  });
+  }
 
   // for (const [entity, sprite] of commands.query(unsynced).all()) {
   //   // Skip if sprite has no texture or already has a loaded Texture

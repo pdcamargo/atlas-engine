@@ -11,7 +11,7 @@ export {
 export type { BundleConstructor, BundleOverrides } from "./ecs/commands";
 export type { EcsPlugin, EcsPluginGroup } from "./plugin";
 export { Events, EventWriter, EventReader } from "./ecs/events";
-export type { EventsApi } from "./ecs/events";
+export type { EventsApi, EventClass } from "./ecs/events";
 
 export * from "./ecs/plugins";
 export * from "./ecs/types";
