@@ -85,14 +85,28 @@ export class SlayGamePlugin implements EcsPlugin {
 
         tileSet.addTilesFromGrid(13, 21);
 
+        // Add an animated tile (e.g., water animation)
+        // This creates an animated tile from a horizontal sequence in the grid
+        // Tile ID 1000 will be the animated water tile
+        tileSet.addAnimatedTileFromGrid(
+          333, // tile ID
+          0, // start column
+          3, // start row
+          4, // 4 frames
+          200, // 200ms per frame
+          true, // horizontal sequence
+          true, // loop
+          1.0 // normal speed
+        );
+
         tilemap.setScale({ x: 0.005, y: 0.005 });
         tilemap.setPosition({ x: -1, y: -1 });
 
         const layer = tilemap.addLayer("default");
 
-        for (let i = 0; i < 2048; i++) {
-          for (let j = 0; j < 2048; j++) {
-            layer.setTileById(i, j, tileSet, 0);
+        for (let i = 0; i < 10; i++) {
+          for (let j = 0; j < 10; j++) {
+            layer.setTileById(i, j, tileSet, 333);
           }
         }
 
@@ -179,7 +193,7 @@ export class SlayGamePlugin implements EcsPlugin {
           texture: textureHandle3,
         });
 
-        for (let i = 0; i < 1000; i++) {
+        for (let i = 0; i < 100; i++) {
           const animatedSprite = new AnimatedSprite(null, 0.5, 0.5);
 
           animatedSprite.addAnimation("runDown", runDownAnimation);

@@ -18,6 +18,11 @@ export { Texture } from "./renderer/Texture";
 
 // Tilemap exports
 export { Tile } from "./renderer/tilemap/Tile";
+export {
+  AnimatedTile,
+  TileAnimationFrame,
+  type AnimatedTileConfig,
+} from "./renderer/tilemap/AnimatedTile";
 export { TileSet, type TileSetOptions } from "./renderer/tilemap/TileSet";
 export {
   TileMapLayer,

@@ -1,4 +1,5 @@
 import { Tile } from "./Tile";
+import { AnimatedTile } from "./AnimatedTile";
 import { TileSet } from "./TileSet";
 import { Color } from "@atlas/core";
 
@@ -36,6 +37,7 @@ export class TileMapLayer {
   private tiles: Map<string, TileData> = new Map();
   private pendingTiles: PendingTileData[] = [];
   private onDirtyCallback?: () => void;
+  private animatedTiles: Map<string, TileData> = new Map(); // Separate tracking for animated tiles
 
   constructor(name: string, onDirtyCallback?: () => void) {
     this.name = name;
@@ -91,7 +93,14 @@ export class TileMapLayer {
 
     // Texture is ready, apply immediately
     const key = this.getKey(x, y);
-    this.tiles.set(key, { tileSet, tile, tint });
+    const tileData = { tileSet, tile, tint };
+    this.tiles.set(key, tileData);
+
+    // Track animated tiles separately for efficient updates
+    if (tile instanceof AnimatedTile) {
+      this.animatedTiles.set(key, tileData);
+    }
+
     this.markDirty();
   }
 
@@ -124,6 +133,8 @@ export class TileMapLayer {
   removeTile(x: number, y: number): boolean {
     const key = this.getKey(x, y);
     const removed = this.tiles.delete(key);
+    // Also remove from animated tiles tracking if present
+    this.animatedTiles.delete(key);
     if (removed) {
       this.markDirty();
     }
@@ -152,6 +163,7 @@ export class TileMapLayer {
   clear(): void {
     if (this.tiles.size > 0) {
       this.tiles.clear();
+      this.animatedTiles.clear();
       this.markDirty();
     }
   }
@@ -162,6 +174,18 @@ export class TileMapLayer {
   getAllTiles(): Array<{ x: number; y: number; data: TileData }> {
     const result: Array<{ x: number; y: number; data: TileData }> = [];
     for (const [key, data] of this.tiles) {
+      const { x, y } = this.parseKey(key);
+      result.push({ x, y, data });
+    }
+    return result;
+  }
+
+  /**
+   * Get only animated tiles (for efficient animation updates)
+   */
+  getAnimatedTiles(): Array<{ x: number; y: number; data: TileData }> {
+    const result: Array<{ x: number; y: number; data: TileData }> = [];
+    for (const [key, data] of this.animatedTiles) {
       const { x, y } = this.parseKey(key);
       result.push({ x, y, data });
     }
@@ -255,11 +279,18 @@ export class TileMapLayer {
 
         // Texture is ready and tile is resolved, apply the tile
         const key = this.getKey(pendingTile.x, pendingTile.y);
-        this.tiles.set(key, {
+        const tileData = {
           tileSet: pendingTile.tileSet,
           tile: tile,
           tint: pendingTile.tint,
-        });
+        };
+        this.tiles.set(key, tileData);
+
+        // Track animated tiles separately for efficient updates
+        if (tile instanceof AnimatedTile) {
+          this.animatedTiles.set(key, tileData);
+        }
+
         appliedCount++;
       } else {
         // Still not ready, keep in pending queue
