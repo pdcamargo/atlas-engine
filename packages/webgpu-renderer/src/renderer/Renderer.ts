@@ -14,6 +14,7 @@ import { RenderBatch } from "../batching";
 import { TileMap } from "./tilemap/TileMap";
 import { TileMapBatch } from "./tilemap/TileMapBatch";
 import { LRUCache } from "../utils/LRUCache";
+import { PostProcessEffect } from "../post-processing/PostProcessEffect";
 
 interface RendererOptions {
   canvas?: HTMLCanvasElement;
@@ -72,6 +73,11 @@ export class WebgpuRenderer {
 
   // VP matrix uniform buffer for instanced rendering
   private vpMatrixBuffer?: GPUBuffer;
+
+  // Post-processing effects
+  private postProcessEffects: PostProcessEffect[] = [];
+  private sceneTexture?: GPUTexture;
+  private postProcessTextures: GPUTexture[] = [];
 
   // Performance tracking
   private drawCallCount: number = 0;
@@ -217,6 +223,14 @@ export class WebgpuRenderer {
     this.primitiveBindGroupLayout =
       this.primitivePipeline.getBindGroupLayout(0);
 
+    // Initialize post-processing effects
+    for (const effect of this.postProcessEffects) {
+      effect.initialize(this.device, this.format);
+    }
+
+    // Create render target textures for post-processing
+    this.updateRenderTargets();
+
     this.#initialized = true;
   }
 
@@ -360,11 +374,12 @@ export class WebgpuRenderer {
   /**
    * Build/update batches from the scene graph
    * Only marks batches dirty when sprites are added/removed, not every frame
+   * Now batches by material + texture instead of just texture
    */
   private updateBatches(sceneGraph: SceneGraph): void {
     // Track which sprites are currently in the scene
     const currentSprites = new Set<Sprite>();
-    const spritesByTexture = new Map<string, Set<Sprite>>();
+    const spritesByBatch = new Map<string, Set<Sprite>>(); // batchKey -> sprites
 
     // Collect all sprites from scene graph
     sceneGraph.traverse((node) => {
@@ -378,22 +393,23 @@ export class WebgpuRenderer {
 
         currentSprites.add(node);
 
-        const textureId = texture.id;
-        if (!spritesByTexture.has(textureId)) {
-          spritesByTexture.set(textureId, new Set());
+        // Create batch key from material + texture
+        const batchKey = `${node.material.id}_${texture.id}`;
+        if (!spritesByBatch.has(batchKey)) {
+          spritesByBatch.set(batchKey, new Set());
         }
-        spritesByTexture.get(textureId)!.add(node);
+        spritesByBatch.get(batchKey)!.add(node);
       }
     });
 
     // Remove sprites from batches that are no longer in the scene
-    for (const [textureId, batch] of this.batches) {
-      const spritesForThisTexture = spritesByTexture.get(textureId);
+    for (const [batchKey, batch] of this.batches) {
+      const spritesForThisBatch = spritesByBatch.get(batchKey);
 
-      if (!spritesForThisTexture) {
-        // No sprites for this texture anymore, remove batch
+      if (!spritesForThisBatch) {
+        // No sprites for this batch anymore, remove it
         batch.destroy();
-        this.batches.delete(textureId);
+        this.batches.delete(batchKey);
       } else {
         // Remove sprites that are no longer in scene
         let removedAny = false;
@@ -412,8 +428,8 @@ export class WebgpuRenderer {
     }
 
     // Add/update sprites in batches
-    for (const [textureId, sprites] of spritesByTexture) {
-      let batch = this.batches.get(textureId);
+    for (const [batchKey, sprites] of spritesByBatch) {
+      let batch = this.batches.get(batchKey);
 
       if (!batch) {
         // Create new batch
@@ -421,9 +437,9 @@ export class WebgpuRenderer {
         const texture = firstSprite?.getTexture();
         if (!firstSprite || !texture) continue;
 
-        batch = new RenderBatch(texture);
+        batch = new RenderBatch(texture, firstSprite.material);
         batch.initialize(this.device);
-        this.batches.set(textureId, batch);
+        this.batches.set(batchKey, batch);
       }
 
       // Add any new sprites to batch (only marks dirty if sprite was added)
@@ -466,14 +482,29 @@ export class WebgpuRenderer {
     // Get view-projection matrix
     const vpMatrix = camera.getViewProjectionMatrix();
 
-    // Begin render pass
+    // Begin command encoder
     const commandEncoder = this.device.createCommandEncoder();
-    const textureView = this.context.getCurrentTexture().createView();
 
+    // Check if we have enabled post-processing effects
+    const enabledPostProcessEffects = this.getEnabledPostProcessEffects();
+    const hasPostProcessing = enabledPostProcessEffects.length > 0;
+
+    // Ensure render targets exist if we have post-processing
+    // We need both scene texture AND ping-pong textures
+    if (hasPostProcessing && (!this.sceneTexture || this.postProcessTextures.length === 0)) {
+      this.updateRenderTargets();
+    }
+
+    // Render target: either scene texture (if post-processing) or canvas
+    const renderTargetView = hasPostProcessing
+      ? this.sceneTexture!.createView()
+      : this.context.getCurrentTexture().createView();
+
+    // Main scene render pass
     const renderPass = commandEncoder.beginRenderPass({
       colorAttachments: [
         {
-          view: textureView,
+          view: renderTargetView,
           clearValue: this.clearColor,
           loadOp: "clear",
           storeOp: "store",
@@ -489,7 +520,10 @@ export class WebgpuRenderer {
       }
     });
 
-    // Render batches (sprites grouped by texture)
+    // Render pre-effects (effects with order < 0, render BEFORE base sprite)
+    this.renderEffects(renderPass, sceneGraph, camera, vpMatrix.data, true);
+
+    // Render batches (sprites grouped by material + texture)
     for (const batch of this.batches.values()) {
       if (batch.isEmpty()) continue;
 
@@ -502,7 +536,16 @@ export class WebgpuRenderer {
       }
     }
 
+    // Render post-effects (effects with order >= 0, render AFTER base sprite)
+    this.renderEffects(renderPass, sceneGraph, camera, vpMatrix.data, false);
+
     renderPass.end();
+
+    // Apply post-processing effects
+    if (hasPostProcessing) {
+      this.applyPostProcessing(commandEncoder, enabledPostProcessEffects);
+    }
+
     this.device.queue.submit([commandEncoder.finish()]);
 
     // Release all buffers back to pools after frame is submitted
@@ -767,6 +810,71 @@ export class WebgpuRenderer {
   }
 
   /**
+   * Render effects for all sprites that have effects
+   * @param preEffects - If true, render only effects with order < 0 (before base sprite)
+   *                     If false, render only effects with order >= 0 (after base sprite)
+   */
+  private renderEffects(
+    renderPass: GPURenderPassEncoder,
+    sceneGraph: SceneGraph,
+    camera: Camera,
+    vpMatrix: Mat4,
+    preEffects: boolean = false
+  ): void {
+    // Collect all sprites with effects
+    const spritesWithEffects: Sprite[] = [];
+
+    sceneGraph.traverseVisible((node) => {
+      if (node instanceof Sprite && node.hasEffects()) {
+        spritesWithEffects.push(node);
+      }
+    });
+
+    if (spritesWithEffects.length === 0) return;
+
+    // Create effect context once for all effects
+    const effectContext = {
+      device: this.device,
+      renderPass,
+      vpMatrix,
+      camera,
+      format: this.format,
+      quadBuffers: this.quadBuffers,
+    };
+
+    // Render effects based on whether we're doing pre or post effects
+    for (const sprite of spritesWithEffects) {
+      const effects = sprite.getEnabledEffects();
+
+      // Filter effects based on pre/post pass
+      const filteredEffects = effects.filter((effect) =>
+        preEffects ? effect.order < 0 : effect.order >= 0
+      );
+
+      if (filteredEffects.length === 0) continue;
+
+      for (const effect of filteredEffects) {
+        // Call beforeRender if the effect has it
+        if (effect.beforeRender) {
+          effect.beforeRender(effectContext);
+        }
+
+        // Render the effect for this sprite
+        effect.render(sprite, effectContext);
+
+        this.drawCallCount++; // Count effect draw calls
+      }
+
+      // Call afterRender for cleanup
+      for (const effect of filteredEffects) {
+        if (effect.afterRender) {
+          effect.afterRender(effectContext);
+        }
+      }
+    }
+  }
+
+  /**
    * Resize the canvas and update internal dimensions
    */
   resize(): void {
@@ -973,5 +1081,145 @@ export class WebgpuRenderer {
 
     // Calculate skipped tiles
     this.skippedTiles = this.totalTiles - this.renderedTiles;
+  }
+
+  /**
+   * Add a post-processing effect to the renderer
+   */
+  addPostProcessEffect(effect: PostProcessEffect): void {
+    if (!this.postProcessEffects.includes(effect)) {
+      this.postProcessEffects.push(effect);
+      this.postProcessEffects.sort((a, b) => a.order - b.order);
+
+      // Initialize effect if renderer is already initialized
+      if (this.isInitialized()) {
+        effect.initialize(this.device, this.format);
+      }
+    }
+  }
+
+  /**
+   * Remove a post-processing effect from the renderer
+   */
+  removePostProcessEffect(effect: PostProcessEffect): void {
+    const index = this.postProcessEffects.indexOf(effect);
+    if (index !== -1) {
+      this.postProcessEffects.splice(index, 1);
+      effect.destroy?.();
+    }
+  }
+
+  /**
+   * Get all post-processing effects
+   */
+  getPostProcessEffects(): PostProcessEffect[] {
+    return [...this.postProcessEffects];
+  }
+
+  /**
+   * Get enabled post-processing effects
+   */
+  getEnabledPostProcessEffects(): PostProcessEffect[] {
+    return this.postProcessEffects.filter((effect) => effect.enabled);
+  }
+
+  /**
+   * Clear all post-processing effects
+   */
+  clearPostProcessEffects(): void {
+    for (const effect of this.postProcessEffects) {
+      effect.destroy?.();
+    }
+    this.postProcessEffects = [];
+  }
+
+  /**
+   * Create or recreate render target textures for post-processing
+   */
+  private updateRenderTargets(): void {
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+
+    // Destroy old textures
+    this.sceneTexture?.destroy();
+    for (const texture of this.postProcessTextures) {
+      texture.destroy();
+    }
+    this.postProcessTextures = [];
+
+    // Create scene texture (where we render the main scene)
+    this.sceneTexture = this.device.createTexture({
+      size: { width, height },
+      format: this.format,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      label: "Scene Render Target",
+    });
+
+    // Create ping-pong textures for post-processing chain
+    // We need at least 2 textures to ping-pong between effects
+    const enabledEffects = this.getEnabledPostProcessEffects();
+    if (enabledEffects.length > 0) {
+      for (let i = 0; i < 2; i++) {
+        this.postProcessTextures.push(
+          this.device.createTexture({
+            size: { width, height },
+            format: this.format,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            label: `Post-Process Texture ${i}`,
+          })
+        );
+      }
+    }
+  }
+
+  /**
+   * Apply post-processing effects chain
+   */
+  private applyPostProcessing(
+    commandEncoder: GPUCommandEncoder,
+    effects: PostProcessEffect[]
+  ): void {
+    if (effects.length === 0) return;
+
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+
+    // Validate we have the necessary render targets
+    if (!this.sceneTexture) {
+      throw new Error("Scene texture not created for post-processing");
+    }
+    if (effects.length > 1 && this.postProcessTextures.length < 2) {
+      throw new Error(`Post-processing requires 2 ping-pong textures, but only ${this.postProcessTextures.length} exist`);
+    }
+
+    // Start with scene texture as source
+    let sourceTexture = this.sceneTexture;
+    let destinationTexture: GPUTexture;
+
+    for (let i = 0; i < effects.length; i++) {
+      const effect = effects[i];
+      const isLastEffect = i === effects.length - 1;
+
+      // Last effect renders to canvas, others to ping-pong textures
+      if (isLastEffect) {
+        destinationTexture = this.context.getCurrentTexture();
+      } else {
+        // Ping-pong between the two post-process textures
+        destinationTexture = this.postProcessTextures[i % 2];
+      }
+
+      // Apply the effect
+      effect.apply(
+        this.device,
+        commandEncoder,
+        sourceTexture,
+        destinationTexture,
+        width,
+        height
+      );
+
+      // Next iteration uses this output as input
+      sourceTexture = destinationTexture;
+    }
   }
 }

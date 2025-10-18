@@ -39,6 +39,34 @@ export {
 // Batching exports
 export { RenderBatch } from "./batching";
 
+// Material exports
+export {
+  Shader,
+  type UniformDefinition,
+  Material,
+  BlendMode,
+  SpriteMaterial,
+  DEFAULT_SPRITE_MATERIAL,
+} from "./materials";
+
+// Effect exports
+export {
+  Effect,
+  type EffectContext,
+  OutlineEffect,
+  DistortionEffect,
+  DistortionType,
+  ShadowEffect,
+} from "./effects";
+
+// Post-processing exports
+export {
+  PostProcessEffect,
+  VignetteEffect,
+  ChromaticAberrationEffect,
+  BloomEffect,
+} from "./post-processing";
+
 export { WebgpuRendererPlugin } from "./ecs/plugin";
 
 export { GpuRenderDevice } from "./ecs/resources/render-device";

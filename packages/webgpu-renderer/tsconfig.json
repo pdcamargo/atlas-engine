@@ -2,6 +2,7 @@
   "extends": "@repo/typescript-config/base.json",
   "include": ["."],
   "exclude": ["node_modules"],
+  "outDir": "./dist",
   "compilerOptions": {
     "target": "ES2022",
     "types": ["@webgpu/types"]

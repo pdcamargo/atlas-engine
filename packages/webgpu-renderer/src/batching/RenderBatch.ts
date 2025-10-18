@@ -2,13 +2,15 @@ import { Mat4 } from "gl-matrix";
 import { Sprite } from "../renderer/Sprite";
 import { Texture } from "../renderer/Texture";
 import { Camera } from "../renderer/Camera";
+import { Material } from "../materials/Material";
 
 /**
- * RenderBatch groups sprites by texture for efficient rendering
+ * RenderBatch groups sprites by material + texture for efficient rendering
  * Supports both individual and instanced rendering based on batch size
  */
 export class RenderBatch {
   public readonly texture: Texture;
+  public readonly material: Material;
   private sprites: Set<Sprite> = new Set();
   private spriteArray: Sprite[] = [];
   private isDirty: boolean = true;
@@ -40,8 +42,9 @@ export class RenderBatch {
   // Frustum culling can be expensive for many sprites - make it optional
   public enableFrustumCulling: boolean = false;
 
-  constructor(texture: Texture) {
+  constructor(texture: Texture, material: Material) {
     this.texture = texture;
+    this.material = material;
     this.instanceData = new Float32Array(0);
   }
 

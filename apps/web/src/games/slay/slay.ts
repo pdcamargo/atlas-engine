@@ -27,6 +27,11 @@ import {
   TextureFilter,
   AnimatedSprite,
   Animation,
+  OutlineEffect,
+  ShadowEffect,
+  VignetteEffect,
+  ChromaticAberrationEffect,
+  BloomEffect,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
@@ -104,9 +109,15 @@ export class SlayGamePlugin implements EcsPlugin {
 
         const layer = tilemap.addLayer("default");
 
-        for (let i = 0; i < 10; i++) {
-          for (let j = 0; j < 10; j++) {
-            layer.setTileById(i, j, tileSet, 333);
+        for (let i = 0; i < 100; i++) {
+          for (let j = 0; j < 100; j++) {
+            layer.setTileById(i, j, tileSet, 0);
+          }
+        }
+
+        for (let i = 0; i < 101; i++) {
+          for (let j = 0; j < 110; j++) {
+            // layer.setTileById(i, j, tileSet, 333);
           }
         }
 
@@ -126,8 +137,8 @@ export class SlayGamePlugin implements EcsPlugin {
           sprite.setFrame(new Rect(frameIndex * frameWidth, 0, frameWidth, 1));
           commands.spawn(sprite, nearestFilter);
           sprite.setPosition({
-            x: Math.random() - 0.5,
-            y: Math.random() - 0.5,
+            x: Math.random() * 10,
+            y: Math.random() * 10,
           });
           sceneGraph.addRoot(sprite);
         }
@@ -193,7 +204,7 @@ export class SlayGamePlugin implements EcsPlugin {
           texture: textureHandle3,
         });
 
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 111; i++) {
           const animatedSprite = new AnimatedSprite(null, 0.5, 0.5);
 
           animatedSprite.addAnimation("runDown", runDownAnimation);
@@ -207,12 +218,34 @@ export class SlayGamePlugin implements EcsPlugin {
 
           animatedSprite.play(index);
 
+          // Add shadow to all sprites
+          const shadowEffect = new ShadowEffect({
+            color: new Color(0, 0, 0, 0.3), // Semi-transparent black
+            distance: 0, // Random height for variety
+            offset: { x: 0, y: 0 }, // Centered at bottom of sprite
+            pixelation: 12,
+            order: -10, // Render well before sprite,
+            scale: { x: 0.2, y: 0.2 },
+          });
+          animatedSprite.addEffect(shadowEffect);
+
+          // Add effects to some sprites for testing
+          if (i % 3 === 0) {
+            // Every 3rd sprite gets an outline effect
+            const outlineEffect = new OutlineEffect({
+              color: new Color(1, 0, 0, 1), // Red outline
+              thickness: 0.02,
+              order: -1, // Render before sprite
+            });
+            animatedSprite.addEffect(outlineEffect);
+          }
+
           commands.spawn(animatedSprite, nearestFilter);
           sceneGraph.addRoot(animatedSprite);
 
           animatedSprite.setPosition({
-            x: Math.random() - 0.5,
-            y: Math.random() - 0.5,
+            x: Math.random() * 5 - 2.5,
+            y: Math.random() * 5 - 2.5,
           });
         }
 
@@ -242,6 +275,34 @@ export class SlayGamePlugin implements EcsPlugin {
         );
 
         commands.spawn(new AudioListener());
+
+        // Add post-processing effects to renderer
+        const renderer = commands.getResource(WebgpuRenderer);
+
+        // Add vignette effect (darkens corners)
+        const vignetteEffect = new VignetteEffect({
+          intensity: 0.5,
+          smoothness: 0.3,
+          order: 0,
+        });
+        renderer.addPostProcessEffect(vignetteEffect);
+
+        // Add chromatic aberration (RGB split for retro look)
+        const chromaticAberrationEffect = new ChromaticAberrationEffect({
+          offset: 0.006,
+          order: 1,
+        });
+        renderer.addPostProcessEffect(chromaticAberrationEffect);
+
+        // Add bloom effect (makes bright areas glow)
+        const bloomEffect = new BloomEffect({
+          threshold: 0.5,
+          intensity: 1.5,
+          bloomStrength: 0.8,
+          blurPasses: 2,
+          order: 2,
+        });
+        renderer.addPostProcessEffect(bloomEffect);
       })
       .addUpdateSystems(({ commands }) => {
         const [, camera] = commands
@@ -280,6 +341,8 @@ export class SlayGamePlugin implements EcsPlugin {
         }
 
         camera.markViewDirty();
+
+        // Note: Distortion effect update removed since we're not using it anymore
       });
   }
 }
