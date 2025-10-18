@@ -52,6 +52,8 @@ export interface AnimationConfig<TStart = any, TEnd = any, TLoop = any> {
   loop?: boolean;
   /** Speed multiplier (1.0 = normal speed, 2.0 = double speed, etc.) */
   speed?: number;
+  /** Optional texture specific to this animation (overrides sprite's base texture) */
+  texture?: Texture | Handle<ImageAsset>;
   /** Optional event class to fire when animation starts */
   onStart?: EventClass<TStart>;
   /** Optional event class to fire when animation ends (non-looping) */
@@ -67,6 +69,7 @@ export class Animation {
   public frames: AnimationFrame[];
   public loop: boolean;
   public speed: number;
+  public texture?: Texture | Handle<ImageAsset>;
   public onStart?: EventClass<any>;
   public onEnd?: EventClass<any>;
   public onLoop?: EventClass<any>;
@@ -75,6 +78,7 @@ export class Animation {
     this.frames = config.frames;
     this.loop = config.loop ?? false;
     this.speed = config.speed ?? 1.0;
+    this.texture = config.texture;
     this.onStart = config.onStart;
     this.onEnd = config.onEnd;
     this.onLoop = config.onLoop;
@@ -157,10 +161,19 @@ export class AnimatedSprite extends Sprite {
       return false;
     }
 
+    const animation = this.animations.get(name)!;
     const shouldReset = reset || this.currentAnimationName !== name;
 
+    // Switch animation
     this.currentAnimationName = name;
     this.state = AnimationState.Playing;
+
+    // Update texture if animation has its own texture
+    if (animation.texture) {
+      this.texture = animation.texture;
+      // Remove TextureSynced marker so texture loading system processes it
+      (this as any)._needsTextureSync = true;
+    }
 
     if (shouldReset) {
       this.currentFrameIndex = 0;
@@ -256,6 +269,35 @@ export class AnimatedSprite extends Sprite {
    */
   getElapsedTime(): number {
     return this.elapsedTime;
+  }
+
+  /**
+   * Get the effective texture for the current animation
+   * Returns animation's texture if set, otherwise the sprite's base texture
+   * Throws if no texture is available
+   */
+  getEffectiveTexture(): Texture | Handle<ImageAsset> | null {
+    const animation = this.getCurrentAnimation();
+
+    // If there's a current animation with its own texture, use it
+    if (animation?.texture) {
+      return animation.texture;
+    }
+
+    // Fall back to base sprite texture
+    if (this.texture) {
+      return this.texture;
+    }
+
+    // No texture available - this will be caught during rendering
+    if (animation && !this.texture) {
+      throw new Error(
+        `[AnimatedSprite] Animation "${this.currentAnimationName}" has no texture, and sprite has no base texture. ` +
+        `Either set a texture on the AnimatedSprite or provide a texture in the animation config.`
+      );
+    }
+
+    return null;
   }
 
   /**

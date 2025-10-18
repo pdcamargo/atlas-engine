@@ -42,6 +42,15 @@ export const textureLoadingSystem = sys(({ commands }) => {
       continue;
     }
 
+    // For AnimatedSprite, check if it needs texture sync (texture changed)
+    const isAnimated = sprite instanceof AnimatedSprite;
+    const needsSync = isAnimated && (sprite as any)._needsTextureSync;
+
+    // Skip if already synced and doesn't need re-sync
+    if (!needsSync && commands.tryGetComponent(entity, TextureSynced)) {
+      continue;
+    }
+
     const handle = sprite.getHandle();
     if (!handle) continue;
 
@@ -84,57 +93,11 @@ export const textureLoadingSystem = sys(({ commands }) => {
       sprite.texture = texture;
     }
 
+    // Clear the needs sync flag for AnimatedSprite
+    if (isAnimated) {
+      (sprite as any)._needsTextureSync = false;
+    }
+
     commands.addComponent(entity, textureSyncedMarker);
   }
-
-  // for (const [entity, sprite] of commands.query(unsynced).all()) {
-  //   // Skip if sprite has no texture or already has a loaded Texture
-  //   if (sprite.texture instanceof Texture) {
-  //     // Mark as synced if have texture but not synced
-  //     commands.addComponent(entity, textureSyncedMarker);
-  //     continue;
-  //   }
-
-  //   // At this point, sprite.texture is a Handle<ImageAsset>
-  //   const handle = sprite.getHandle();
-  //   if (!handle) continue;
-
-  //   // Check if the asset is loaded
-  //   const loadState = assetServer.getLoadState(handle);
-  //   if (loadState !== LoadState.Loaded) {
-  //     // Not loaded yet, skip for now (will be checked again next frame)
-  //     continue;
-  //   }
-
-  //   // Get the loaded asset
-  //   const imageAsset = assetServer.getAsset<ImageAsset>(handle);
-  //   if (!imageAsset || !imageAsset.image) {
-  //     console.warn(`[TextureLoading] ImageAsset loaded but has no image data`);
-  //     continue;
-  //   }
-
-  //   // Check for TextureFilter component to customize texture creation
-  //   const textureFilter = commands.tryGetComponent(entity, TextureFilter);
-  //   if (!textureFilter) {
-  //     console.warn(`[TextureLoading] TextureFilter component not found`);
-  //     continue;
-  //   }
-
-  //   // Create Texture from ImageAsset with optional filter settings
-  //   const texture = Texture.fromSource(device, imageAsset.image, {
-  //     minFilter: textureFilter?.minFilter ?? "linear",
-  //     magFilter: textureFilter?.magFilter ?? "linear",
-  //     mips: textureFilter?.mips ?? true,
-  //     flipY: textureFilter?.flipY ?? true,
-  //     addressModeU: textureFilter?.addressModeU ?? "repeat",
-  //     addressModeV: textureFilter?.addressModeV ?? "repeat",
-  //     sourceHandle: handle, // Keep handle for hot-reload support
-  //   });
-
-  //   // Replace handle with loaded texture
-  //   sprite.texture = texture;
-
-  //   // Mark as synced to avoid re-checking
-  //   commands.addComponent(entity, textureSyncedMarker);
-  // }
 }).label("WebgpuRenderer::TextureLoading");

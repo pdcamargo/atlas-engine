@@ -118,58 +118,89 @@ export class SlayGamePlugin implements EcsPlugin {
           sceneGraph.addRoot(sprite);
         }
 
-        const animatedSprite = new AnimatedSprite(textureHandle, 0.5, 0.5);
-
         const getX = (index: number) => index * frameWidth;
-        const getY = (index: number) => 0;
 
-        const runAnimation = new Animation({
-          frames: [
-            {
-              frame: new Rect(getX(0), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-            {
-              frame: new Rect(getX(1), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-            {
-              frame: new Rect(getX(2), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-            {
-              frame: new Rect(getX(3), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-            {
-              frame: new Rect(getX(4), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-            {
-              frame: new Rect(getX(5), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-            {
-              frame: new Rect(getX(6), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-            {
-              frame: new Rect(getX(7), getY(0), frameWidth, 1),
-              duration: 100,
-            },
-          ],
+        const frames2 = [
+          {
+            frame: new Rect(getX(0), 0, frameWidth, 1),
+            duration: 100,
+          },
+          {
+            frame: new Rect(getX(1), 0, frameWidth, 1),
+            duration: 100,
+          },
+          {
+            frame: new Rect(getX(2), 0, frameWidth, 1),
+            duration: 100,
+          },
+          {
+            frame: new Rect(getX(3), 0, frameWidth, 1),
+            duration: 100,
+          },
+          {
+            frame: new Rect(getX(4), 0, frameWidth, 1),
+            duration: 100,
+          },
+          {
+            frame: new Rect(getX(5), 0, frameWidth, 1),
+            duration: 100,
+          },
+          {
+            frame: new Rect(getX(6), 0, frameWidth, 1),
+            duration: 100,
+          },
+          {
+            frame: new Rect(getX(7), 0, frameWidth, 1),
+            duration: 100,
+          },
+        ];
+
+        const runDownAnimation = new Animation({
+          frames: frames2,
           loop: true,
+          texture: textureHandle,
         });
 
-        animatedSprite.addAnimation("runDown", runAnimation);
-        animatedSprite.addAnimation("runUp", runAnimation);
-        animatedSprite.addAnimation("runRight", runAnimation);
-        animatedSprite.addAnimation("runLeft", runAnimation);
+        const runUpAnimation = new Animation({
+          frames: frames2,
+          loop: true,
+          texture: textureHandle2,
+        });
 
-        animatedSprite.play("runLeft");
+        const runRightAnimation = new Animation({
+          frames: frames2,
+          loop: true,
+          texture: textureHandle4,
+        });
 
-        commands.spawn(animatedSprite, nearestFilter);
-        sceneGraph.addRoot(animatedSprite);
+        const runLeftAnimation = new Animation({
+          frames: frames2,
+          loop: true,
+          texture: textureHandle3,
+        });
+
+        for (let i = 0; i < 100; i++) {
+          const animatedSprite = new AnimatedSprite(textureHandle, 0.5, 0.5);
+
+          animatedSprite.addAnimation("runDown", runDownAnimation);
+          animatedSprite.addAnimation("runUp", runUpAnimation);
+          animatedSprite.addAnimation("runRight", runRightAnimation);
+          animatedSprite.addAnimation("runLeft", runLeftAnimation);
+
+          const index = ["runDown", "runUp", "runRight", "runLeft"][
+            Math.floor(Math.random() * 4)
+          ];
+
+          animatedSprite.play(index);
+
+          commands.spawn(animatedSprite, nearestFilter);
+          sceneGraph.addRoot(animatedSprite);
+
+          animatedSprite.setPosition({
+            x: Math.random() - 0.5,
+            y: Math.random() - 0.5,
+          });
+        }
 
         // Create camera
         const camera = new OrthographicCamera(-1, 1, -1, 1, 0.1, 100);
