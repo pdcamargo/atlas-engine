@@ -179,8 +179,8 @@ export class SlayGamePlugin implements EcsPlugin {
           texture: textureHandle3,
         });
 
-        for (let i = 0; i < 100; i++) {
-          const animatedSprite = new AnimatedSprite(textureHandle, 0.5, 0.5);
+        for (let i = 0; i < 1000; i++) {
+          const animatedSprite = new AnimatedSprite(null, 0.5, 0.5);
 
           animatedSprite.addAnimation("runDown", runDownAnimation);
           animatedSprite.addAnimation("runUp", runUpAnimation);
