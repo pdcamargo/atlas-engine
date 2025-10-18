@@ -10,11 +10,13 @@ import { textureLoadingSystem } from "./systems/texture-loading";
 import { tileSetLoadingSystem } from "./systems/tileset-loading";
 import { animationUpdateSystem } from "./systems/animation-update";
 import { tileMapAnimationUpdateSystem } from "./systems/tilemap-animation-update";
+import { particleUpdateSystem } from "./systems/particle-update";
 import { TextureCache } from "./resources/texture-cache";
 
 const ResizeSystem = Symbol("WebgpuRenderer::PreUpdate");
 const LoadingSystem = Symbol("WebgpuRenderer::TextureLoading");
 const AnimationSystem = Symbol("WebgpuRenderer::Animation");
+const ParticleSystem = Symbol("WebgpuRenderer::ParticleUpdate");
 const RenderSystem = Symbol("WebgpuRenderer::Render");
 
 export type WebgpuRendererPluginOptions = {
@@ -44,7 +46,7 @@ export class WebgpuRendererPlugin implements EcsPlugin {
       )
       .addSystems(
         SystemType.Update,
-        createSet(AnimationSystem, animationUpdateSystem, tileMapAnimationUpdateSystem)
+        createSet(AnimationSystem, animationUpdateSystem, tileMapAnimationUpdateSystem, particleUpdateSystem)
       )
       .addSystems(SystemType.Render, createSet(RenderSystem, render));
   }

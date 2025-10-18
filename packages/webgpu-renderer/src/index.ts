@@ -67,6 +67,16 @@ export {
   BloomEffect,
 } from "./post-processing";
 
+// Particle system exports
+export {
+  ParticleEmitter,
+  ParticleSystem,
+  type ParticleEmitterConfig,
+  type ParticleBlendMode,
+  type EmissionShape,
+  ParticlePresets,
+} from "./particles";
+
 export { WebgpuRendererPlugin } from "./ecs/plugin";
 
 export { GpuRenderDevice } from "./ecs/resources/render-device";

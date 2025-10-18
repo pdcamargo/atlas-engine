@@ -32,6 +32,8 @@ import {
   VignetteEffect,
   ChromaticAberrationEffect,
   BloomEffect,
+  ParticleEmitter,
+  ParticlePresets,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
@@ -275,6 +277,27 @@ export class SlayGamePlugin implements EcsPlugin {
         );
 
         commands.spawn(new AudioListener());
+
+        // Add particle effects
+        // const fireEffect = ParticlePresets.fire({ intensity: 0.1 });
+        // fireEffect.setPosition({ x: 0, y: 0, z: 0 });
+        // sceneGraph.addRoot(fireEffect);
+        // commands.spawn(fireEffect);
+
+        // const smokeEffect = ParticlePresets.smoke({ intensity: 0.15 });
+        // smokeEffect.setPosition({ x: 0, y: 0, z: 0 });
+        // sceneGraph.addRoot(smokeEffect);
+        // commands.spawn(smokeEffect);
+
+        // const sparklesEffect = ParticlePresets.sparkles({ intensity: 1.0 });
+        // sparklesEffect.setPosition({ x: 0, y: 0, z: 0 });
+        // sceneGraph.addRoot(sparklesEffect);
+        // commands.spawn(sparklesEffect);
+
+        const magicEffect = ParticlePresets.magic({ intensity: 0.17 });
+        magicEffect.setPosition({ x: 0, y: 0, z: 0 });
+        sceneGraph.addRoot(magicEffect);
+        commands.spawn(magicEffect);
 
         // Add post-processing effects to renderer
         const renderer = commands.getResource(WebgpuRenderer);

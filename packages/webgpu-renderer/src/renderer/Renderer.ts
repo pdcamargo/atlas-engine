@@ -15,6 +15,7 @@ import { TileMap } from "./tilemap/TileMap";
 import { TileMapBatch } from "./tilemap/TileMapBatch";
 import { LRUCache } from "../utils/LRUCache";
 import { PostProcessEffect } from "../post-processing/PostProcessEffect";
+import { ParticleEmitter } from "../particles/ParticleEmitter";
 
 interface RendererOptions {
   canvas?: HTMLCanvasElement;
@@ -517,6 +518,8 @@ export class WebgpuRenderer {
         this.renderTileMap(renderPass, node, vpMatrix.data, camera);
       } else if (node instanceof Square) {
         this.renderSquare(renderPass, node, vpMatrix.data);
+      } else if (node instanceof ParticleEmitter) {
+        this.renderParticleEmitter(renderPass, node, vpMatrix.data);
       }
     });
 
@@ -1081,6 +1084,28 @@ export class WebgpuRenderer {
 
     // Calculate skipped tiles
     this.skippedTiles = this.totalTiles - this.renderedTiles;
+  }
+
+  /**
+   * Render a particle emitter
+   */
+  private renderParticleEmitter(
+    renderPass: GPURenderPassEncoder,
+    emitter: ParticleEmitter,
+    vpMatrix: Float32Array
+  ): void {
+    // Initialize emitter if not already initialized (fire and forget - will render next frame)
+    if (!emitter.isInitialized()) {
+      // Start initialization asynchronously
+      emitter.initialize(this.device, this.format).catch((error) => {
+        console.error("Failed to initialize particle emitter:", error);
+      });
+      return; // Skip rendering this frame
+    }
+
+    // Render particles
+    emitter.render(renderPass, vpMatrix);
+    this.drawCallCount++;
   }
 
   /**
