@@ -84,3 +84,26 @@ export { GpuPresentationFormat } from "./ecs/resources/presentation-format";
 export { GpuCanvasContext } from "./ecs/resources/canvas-context";
 
 export * from "./ecs/components";
+
+// Compute shader framework exports
+export {
+  ComputeShader,
+  ComputeWorker,
+  ComputeWorkerBuilder,
+  ComputeWorkerInstance,
+  BufferType,
+  type BufferDefinition,
+  type PassDefinition,
+  type WorkgroupSize,
+  type BufferData,
+  type TypedArray,
+  // Utility functions
+  createUniformBuffer,
+  createStorageBuffer,
+  createStagingBuffer,
+  writeBuffer,
+  readBuffer,
+  toTypedArray,
+  getBufferSize,
+  alignBufferSize,
+} from "./compute";
