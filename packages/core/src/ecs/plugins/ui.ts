@@ -7,7 +7,7 @@ export class ElementClickedEvent<TData = any> {
   ) {}
 }
 
-export const UiSet = Symbol("UiSet");
+export const UiSet2 = Symbol("UiSet2");
 
 export class UiContainer {
   #element: HTMLElement;
@@ -270,7 +270,7 @@ export class Button extends UiContainer {
   }
 }
 
-export class UiPlugin implements EcsPlugin {
+export class UiPlugin2 implements EcsPlugin {
   constructor() {}
 
   public async build(app: App) {

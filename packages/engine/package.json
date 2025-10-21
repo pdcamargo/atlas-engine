@@ -21,6 +21,7 @@
     "@atlas/webgpu-renderer": "workspace:*",
     "@atlas/audio": "workspace:*",
     "@atlas/animator": "workspace:*",
+    "@atlas/ui": "workspace:*",
     "reflect-metadata": "^0.2.2"
   }
 }

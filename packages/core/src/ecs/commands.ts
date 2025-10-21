@@ -172,6 +172,9 @@ function entityCommand(entity: Entity, commands: Commands) {
     get: <T>(componentClass: ComponentClass<T>): T => {
       return commands.getComponent(entity, componentClass);
     },
+    id: () => {
+      return entity;
+    },
   };
 }
 
@@ -188,6 +191,8 @@ function spawnEntityCommand(entity: Entity, commands: Commands) {
     },
     insert: (...components: unknown[]) => {
       commands.addComponents(entity, ...components);
+
+      return entityCommand(entity, commands);
     },
   };
 }
@@ -280,6 +285,294 @@ export class Commands {
     c5: T5,
     c6: T6
   ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+    T10 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9,
+    c10: T10
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+    T10 extends object,
+    T11 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9,
+    c10: T10,
+    c11: T11
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+    T10 extends object,
+    T11 extends object,
+    T12 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9,
+    c10: T10,
+    c11: T11,
+    c12: T12
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+    T10 extends object,
+    T11 extends object,
+    T12 extends object,
+    T13 extends object,
+    T14 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9,
+    c10: T10,
+    c11: T11,
+    c12: T12,
+    c13: T13,
+    c14: T14
+  ): ReturnType<typeof spawnEntityCommand>;
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+    T10 extends object,
+    T11 extends object,
+    T12 extends object,
+    T13 extends object,
+    T14 extends object,
+    T15 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9,
+    c10: T10,
+    c11: T11,
+    c12: T12,
+    c13: T13,
+    c14: T14,
+    c15: T15
+  ): ReturnType<typeof spawnEntityCommand>;
+
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+    T10 extends object,
+    T11 extends object,
+    T12 extends object,
+    T13 extends object,
+    T14 extends object,
+    T15 extends object,
+    T16 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9,
+    c10: T10,
+    c11: T11,
+    c12: T12,
+    c13: T13,
+    c14: T14,
+    c15: T15,
+    c16: T16
+  ): ReturnType<typeof spawnEntityCommand>;
+
+  public spawn<
+    T1 extends object,
+    T2 extends object,
+    T3 extends object,
+    T4 extends object,
+    T5 extends object,
+    T6 extends object,
+    T7 extends object,
+    T8 extends object,
+    T9 extends object,
+    T10 extends object,
+    T11 extends object,
+    T12 extends object,
+    T13 extends object,
+    T14 extends object,
+    T15 extends object,
+    T16 extends object,
+    T17 extends object,
+  >(
+    c1: T1,
+    c2: T2,
+    c3: T3,
+    c4: T4,
+    c5: T5,
+    c6: T6,
+    c7: T7,
+    c8: T8,
+    c9: T9,
+    c10: T10,
+    c11: T11,
+    c12: T12,
+    c13: T13,
+    c14: T14,
+    c15: T15,
+    c16: T16,
+    c17: T17
+  ): ReturnType<typeof spawnEntityCommand>;
+
   public spawn(...components: any[]): ReturnType<typeof spawnEntityCommand> {
     const entity = this.#world.createEntity();
 

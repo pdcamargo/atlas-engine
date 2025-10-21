@@ -11,13 +11,11 @@ export class FpsDisplay {}
 export class RootContainer {}
 
 function updateFps({ commands }: SystemFnArguments) {
-  const fps = commands.getResource(Time).fps;
-
-  const [[, fpsText]] = commands.all(UiContainer);
-
-  if (fpsText && fpsText.textContent !== `FPS: ${Math.ceil(fps).toFixed(0)}`) {
-    fpsText.setTextContent(`FPS: ${Math.ceil(fps).toFixed(0)}`);
-  }
+  // const fps = commands.getResource(Time).fps;
+  // const [[, fpsText]] = commands.all(UiContainer);
+  // if (fpsText && fpsText.textContent !== `FPS: ${Math.ceil(fps).toFixed(0)}`) {
+  //   fpsText.setTextContent(`FPS: ${Math.ceil(fps).toFixed(0)}`);
+  // }
 }
 
 export class DebugPlugin implements EcsPlugin {

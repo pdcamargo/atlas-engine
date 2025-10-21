@@ -1,0 +1,1 @@
+{"version":3,"file":"FullscreenQuad.d.ts","sourceRoot":"","sources":["FullscreenQuad.ts"],"names":[],"mappings":"AAAA;;;GAGG;AACH,qBAAa,cAAc;IACzB,OAAO,CAAC,YAAY,CAAY;IAChC,OAAO,CAAC,WAAW,CAAY;gBAEnB,MAAM,EAAE,SAAS;IAiC7B;;OAEG;IACH,MAAM,CAAC,qBAAqB,IAAI,qBAAqB;IAoBrD;;OAEG;IACH,IAAI,CAAC,UAAU,EAAE,oBAAoB,GAAG,IAAI;IAM5C;;OAEG;IACH,OAAO,IAAI,IAAI;CAIhB"}

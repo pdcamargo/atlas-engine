@@ -6,11 +6,11 @@ import {
   FileSystemPlugin,
   InputPlugin,
   TimePlugin,
-  UiPlugin,
   ViewportPlugin,
 } from "@atlas/core";
 import { WebgpuRendererPlugin } from "@atlas/webgpu-renderer";
 import { AudioPlugin } from "@atlas/audio";
+import { UiPlugin } from "@atlas/ui";
 
 export type DefaultPluginOptions = {
   container?: HTMLElement | null;
@@ -31,11 +31,11 @@ export class DefaultPlugin implements EcsPluginGroup {
       new InputPlugin(),
       new TimePlugin(),
       new AssetsPlugin(),
-      new UiPlugin(),
       new WebgpuRendererPlugin({
         canvas: this.options?.canvas ?? undefined,
       }),
       new AudioPlugin(),
+      new UiPlugin(),
     ];
   }
 }

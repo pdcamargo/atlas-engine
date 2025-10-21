@@ -156,6 +156,9 @@ importers:
       '@atlas/core':
         specifier: workspace:*
         version: link:../core
+      '@atlas/ui':
+        specifier: workspace:*
+        version: link:../ui
       '@atlas/webgpu-renderer':
         specifier: workspace:*
         version: link:../webgpu-renderer
@@ -225,6 +228,13 @@ importers:
   packages/typescript-config: {}
 
   packages/ui:
+    dependencies:
+      '@atlas/core':
+        specifier: workspace:*
+        version: link:../core
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
     devDependencies:
       '@repo/eslint-config':
         specifier: workspace:*
@@ -232,6 +242,9 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@repo/utils':
+        specifier: workspace:*
+        version: link:../utils
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
