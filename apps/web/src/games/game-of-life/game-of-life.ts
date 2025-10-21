@@ -20,6 +20,8 @@ import {
   ImageAsset,
   TextureFilter,
   Texture,
+  Input,
+  KeyCode,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
@@ -195,9 +197,10 @@ export class GameOfLifePlugin implements EcsPlugin {
       .addUpdateSystems(({ commands }) => {
         const [, simulation] = commands.query(GameOfLifeSimulation).find();
         const time = commands.getResource(Time);
+        const input = commands.getResource(Input);
 
         // Handle keyboard input
-        this.handleInput(simulation);
+        this.handleInput(simulation, input);
 
         // Skip if paused (unless in step mode)
         if (simulation.isPaused && !simulation.stepMode) {
@@ -285,66 +288,50 @@ export class GameOfLifePlugin implements EcsPlugin {
   /**
    * Handle keyboard input for pattern selection and controls
    */
-  private handleInput(simulation: GameOfLifeSimulation) {
-    // Note: This is a simple keyboard check - you'd want to use proper input system
-    // For now, we'll use DOM events
-    if (!this.keyboardSetup) {
-      this.setupKeyboard(simulation);
+  private handleInput(simulation: GameOfLifeSimulation, input: Input) {
+    // Space - Pause/Resume
+    if (input.justPressed(KeyCode.Space)) {
+      simulation.isPaused = !simulation.isPaused;
+      console.log(simulation.isPaused ? "⏸️ Paused" : "▶️ Resumed");
     }
-  }
 
-  private keyboardSetup = false;
-  private keysPressed = new Set<string>();
-
-  private setupKeyboard(simulation: GameOfLifeSimulation) {
-    this.keyboardSetup = true;
-
-    window.addEventListener("keydown", (e) => {
-      if (this.keysPressed.has(e.key.toLowerCase())) return;
-      this.keysPressed.add(e.key.toLowerCase());
-
-      switch (e.key.toLowerCase()) {
-        case " ": // Space - Pause/Resume
-          simulation.isPaused = !simulation.isPaused;
-          console.log(simulation.isPaused ? "⏸️ Paused" : "▶️ Resumed");
-          break;
-
-        case "s": // S - Single step
-          if (simulation.isPaused) {
-            simulation.stepMode = true;
-            console.log("⏭️ Step forward");
-          }
-          break;
-
-        case "r": // R - Random
-          this.loadPattern(simulation, "random");
-          break;
-
-        case "g": // G - Glider
-          this.loadPattern(simulation, "glider");
-          break;
-
-        case "p": // P - Pulsar
-          this.loadPattern(simulation, "pulsar");
-          break;
-
-        case "l": // L - LWSS
-          this.loadPattern(simulation, "lwss");
-          break;
-
-        case "w": // W - Gosper Glider Gun
-          this.loadPattern(simulation, "gun");
-          break;
-
-        case "c": // C - Clear
-          this.loadPattern(simulation, "clear");
-          break;
+    // S - Single step (when paused)
+    if (input.justPressed(KeyCode.KeyS)) {
+      if (simulation.isPaused) {
+        simulation.stepMode = true;
+        console.log("⏭️ Step forward");
       }
-    });
+    }
 
-    window.addEventListener("keyup", (e) => {
-      this.keysPressed.delete(e.key.toLowerCase());
-    });
+    // R - Random pattern
+    if (input.justPressed(KeyCode.KeyR)) {
+      this.loadPattern(simulation, "random");
+    }
+
+    // G - Glider
+    if (input.justPressed(KeyCode.KeyG)) {
+      this.loadPattern(simulation, "glider");
+    }
+
+    // P - Pulsar
+    if (input.justPressed(KeyCode.KeyP)) {
+      this.loadPattern(simulation, "pulsar");
+    }
+
+    // L - LWSS
+    if (input.justPressed(KeyCode.KeyL)) {
+      this.loadPattern(simulation, "lwss");
+    }
+
+    // W - Gosper Glider Gun
+    if (input.justPressed(KeyCode.KeyW)) {
+      this.loadPattern(simulation, "gun");
+    }
+
+    // C - Clear
+    if (input.justPressed(KeyCode.KeyC)) {
+      this.loadPattern(simulation, "clear");
+    }
   }
 
   /**
