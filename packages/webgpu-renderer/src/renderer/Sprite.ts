@@ -76,11 +76,16 @@ export class Sprite extends SceneNode {
     this.frame = frame;
   }
 
+  getTint(): Color {
+    return this.tint;
+  }
+
   /**
    * Set the tint color for this sprite
    */
   setTint(tint: Color): void {
     this.tint = tint;
+    this.markDirty(); // Mark sprite as dirty to trigger re-render
   }
 
   /**

@@ -19,6 +19,7 @@ import {
   AssetServer,
   ImageAsset,
   TextureFilter,
+  Texture,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
@@ -47,11 +48,32 @@ class GameOfLifeSimulation {
   ) {}
 }
 
+function createGOLImage() {
+  const size = 100;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Failed to get canvas context");
+  }
+  const fillStyle = new Color(0.2, 1.0, 0.4);
+  const strokeStyle = new Color(0, 0, 0);
+  ctx.fillStyle = fillStyle.toHex();
+  ctx.strokeStyle = strokeStyle.toHex();
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.stroke();
+  return canvas;
+}
+
 export class GameOfLifePlugin implements EcsPlugin {
-  private gridWidth = 128; // Grid width in cells
-  private gridHeight = 128; // Grid height in cells
-  private cellSize = 0.03; // Visual size of each cell
-  private updateInterval = 100; // Milliseconds between generations
+  private gridWidth = 32; // Grid width in cells (small for testing)
+  private gridHeight = 32; // Grid height in cells
+  private cellSize = 0.1; // Visual size of each cell (large for visibility)
+  private updateInterval = 200; // Milliseconds between generations (slower for debugging)
   private lastUpdate = 0;
 
   build(app: App) {
@@ -67,12 +89,9 @@ export class GameOfLifePlugin implements EcsPlugin {
 
         // Get resources
         const device = commands.getResource(GpuRenderDevice).get();
-        const assetServer = commands.getResource(AssetServer);
 
         // Load a simple texture for cells
-        const cellTexture = assetServer.load<ImageAsset>(
-          "/sprites/character/sprites/RUN/run_down.png"
-        );
+        const cellTexture = Texture.fromSource(device, createGOLImage());
 
         const nearestFilter = new TextureFilter({
           minFilter: "nearest",
@@ -102,9 +121,17 @@ export class GameOfLifePlugin implements EcsPlugin {
         const aliveColor = new Color(0.2, 1.0, 0.4); // Green for alive
         const deadColor = new Color(0.1, 0.1, 0.1); // Dark for dead
 
+        console.log(
+          `Creating ${this.gridWidth * this.gridHeight} cell sprites...`
+        );
+
         for (let y = 0; y < this.gridHeight; y++) {
           for (let x = 0; x < this.gridWidth; x++) {
-            const sprite = new Sprite(cellTexture, this.cellSize, this.cellSize);
+            const sprite = new Sprite(
+              cellTexture,
+              this.cellSize,
+              this.cellSize
+            );
 
             // Position in grid (centered at origin)
             const worldX = (x - this.gridWidth / 2) * this.cellSize;
@@ -153,7 +180,9 @@ export class GameOfLifePlugin implements EcsPlugin {
         commands.spawn(camera, new MainCamera());
         commands.spawn(sceneGraph);
 
-        console.log(`✅ Game of Life initialized (${this.gridWidth}x${this.gridHeight} grid)`);
+        console.log(
+          `✅ Game of Life initialized (${this.gridWidth}x${this.gridHeight} grid)`
+        );
         console.log("🎮 Controls:");
         console.log("  SPACE - Pause/Resume");
         console.log("  R - Random pattern");
@@ -182,7 +211,10 @@ export class GameOfLifePlugin implements EcsPlugin {
 
         // Throttle updates to updateInterval
         const currentTime = Date.now();
-        if (currentTime - this.lastUpdate < this.updateInterval && !simulation.stepMode) {
+        if (
+          currentTime - this.lastUpdate < this.updateInterval &&
+          !simulation.stepMode
+        ) {
           return;
         }
         this.lastUpdate = currentTime;
@@ -215,16 +247,30 @@ export class GameOfLifePlugin implements EcsPlugin {
             const aliveColor = new Color(0.2, 1.0, 0.4);
             const deadColor = new Color(0.1, 0.1, 0.1);
 
+            let updatedCount = 0;
             for (let i = 0; i < cellData.length; i++) {
               const sprite = simulation.sprites[i];
-              sprite.setTint(cellData[i] === 1 ? aliveColor : deadColor);
+              const newColor = cellData[i] === 1 ? aliveColor : deadColor;
+              sprite.setTint(newColor); // Now properly marks sprite as dirty
+
+              if (cellData[i] === 1) updatedCount++;
             }
 
             // Increment generation counter
             simulation.generation++;
 
             if (simulation.generation % 10 === 0) {
-              console.log(`Generation ${simulation.generation}: ${aliveCount} alive cells`);
+              console.log(
+                `Generation ${simulation.generation}: ${aliveCount} alive cells (updated ${updatedCount} sprites)`
+              );
+
+              // Debug: Check first sprite's state
+              const firstSprite = simulation.sprites[0];
+              console.log(
+                `  First sprite tint:`,
+                firstSprite.getTint?.() || "no getTint method"
+              );
+              console.log(`  First cell state: ${cellData[0]}`);
             }
           })
           .catch((error) => {
@@ -334,7 +380,12 @@ export class GameOfLifePlugin implements EcsPlugin {
         break;
 
       case "gun":
-        newState = GameOfLifePatterns.gosperGliderGun(w, h, centerX - 18, centerY - 5);
+        newState = GameOfLifePatterns.gosperGliderGun(
+          w,
+          h,
+          centerX - 18,
+          centerY - 5
+        );
         console.log("🔫 Loaded Gosper Glider Gun");
         break;
 
