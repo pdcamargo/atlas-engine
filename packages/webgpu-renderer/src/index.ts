@@ -8,9 +8,9 @@ export { Sprite } from "./renderer/Sprite";
 export { InstancedSprite } from "./renderer/InstancedSprite";
 export {
   AnimatedSprite,
-  Animation,
+  AnimatedSpriteAnimation,
   AnimationFrame,
-  AnimationState,
+  AnimatedSpriteAnimationState,
   type AnimationConfig,
 } from "./renderer/AnimatedSprite";
 export { Primitive, Square } from "./renderer/Primitive";

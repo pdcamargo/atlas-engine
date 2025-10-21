@@ -169,6 +169,9 @@ function entityCommand(entity: Entity, commands: Commands) {
         parent.parentId = parentId;
       }
     },
+    get: <T>(componentClass: ComponentClass<T>): T => {
+      return commands.getComponent(entity, componentClass);
+    },
   };
 }
 
@@ -424,7 +427,7 @@ export class Commands {
       return (args[0] as QueryBuilder<any>).bind(this.#world);
     }
     const withComponents = args as readonly ComponentClass<unknown>[];
-    return new QueryBuilder<any>(this.#world, ...withComponents as any);
+    return new QueryBuilder<any>(this.#world, ...(withComponents as any));
   }
 }
 

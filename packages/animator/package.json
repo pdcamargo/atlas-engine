@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/engine",
+  "name": "@atlas/animator",
   "version": "0.0.0",
   "exports": {
     ".": "./src/index.ts"
@@ -12,15 +12,11 @@
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@repo/utils": "workspace:*",
-    "@webgpu/types": "^0.1.64",
     "eslint": "^8.57.0",
     "typescript": "5.5.4"
   },
   "dependencies": {
     "@atlas/core": "workspace:*",
-    "@atlas/webgpu-renderer": "workspace:*",
-    "@atlas/audio": "workspace:*",
-    "@atlas/animator": "workspace:*",
     "reflect-metadata": "^0.2.2"
   }
 }

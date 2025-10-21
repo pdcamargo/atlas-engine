@@ -65,7 +65,7 @@ export interface AnimationConfig<TStart = any, TEnd = any, TLoop = any> {
 /**
  * Represents a single animation with frames and configuration
  */
-export class Animation {
+export class AnimatedSpriteAnimation {
   public frames: AnimationFrame[];
   public loop: boolean;
   public speed: number;
@@ -95,7 +95,7 @@ export class Animation {
 /**
  * Playback state for the animated sprite
  */
-export enum AnimationState {
+export enum AnimatedSpriteAnimationState {
   Playing,
   Paused,
   Stopped,
@@ -106,11 +106,12 @@ export enum AnimationState {
  * Extends Sprite and adds animation playback capabilities
  */
 export class AnimatedSprite extends Sprite {
-  private animations: Map<string, Animation> = new Map();
+  private animations: Map<string, AnimatedSpriteAnimation> = new Map();
   private currentAnimationName: string | null = null;
   private currentFrameIndex: number = 0;
   private elapsedTime: number = 0;
-  private state: AnimationState = AnimationState.Stopped;
+  private state: AnimatedSpriteAnimationState =
+    AnimatedSpriteAnimationState.Stopped;
   private hasStartEventFired: boolean = false;
 
   constructor(
@@ -125,7 +126,7 @@ export class AnimatedSprite extends Sprite {
   /**
    * Add an animation to this sprite
    */
-  addAnimation(name: string, animation: Animation): void {
+  addAnimation(name: string, animation: AnimatedSpriteAnimation): void {
     this.animations.set(name, animation);
   }
 
@@ -139,7 +140,7 @@ export class AnimatedSprite extends Sprite {
   /**
    * Get an animation by name
    */
-  getAnimation(name: string): Animation | undefined {
+  getAnimation(name: string): AnimatedSpriteAnimation | undefined {
     return this.animations.get(name);
   }
 
@@ -166,7 +167,7 @@ export class AnimatedSprite extends Sprite {
 
     // Switch animation
     this.currentAnimationName = name;
-    this.state = AnimationState.Playing;
+    this.state = AnimatedSpriteAnimationState.Playing;
 
     // Update texture if animation has its own texture
     if (animation.texture) {
@@ -189,7 +190,7 @@ export class AnimatedSprite extends Sprite {
    * Stop the current animation and reset to first frame
    */
   stop(): void {
-    this.state = AnimationState.Stopped;
+    this.state = AnimatedSpriteAnimationState.Stopped;
     this.currentFrameIndex = 0;
     this.elapsedTime = 0;
     this.hasStartEventFired = false;
@@ -200,8 +201,8 @@ export class AnimatedSprite extends Sprite {
    * Pause the current animation
    */
   pause(): void {
-    if (this.state === AnimationState.Playing) {
-      this.state = AnimationState.Paused;
+    if (this.state === AnimatedSpriteAnimationState.Playing) {
+      this.state = AnimatedSpriteAnimationState.Paused;
     }
   }
 
@@ -209,15 +210,15 @@ export class AnimatedSprite extends Sprite {
    * Resume the current animation if paused
    */
   resume(): void {
-    if (this.state === AnimationState.Paused) {
-      this.state = AnimationState.Playing;
+    if (this.state === AnimatedSpriteAnimationState.Paused) {
+      this.state = AnimatedSpriteAnimationState.Playing;
     }
   }
 
   /**
    * Get the current animation
    */
-  getCurrentAnimation(): Animation | null {
+  getCurrentAnimation(): AnimatedSpriteAnimation | null {
     if (!this.currentAnimationName) return null;
     return this.animations.get(this.currentAnimationName) ?? null;
   }
@@ -232,7 +233,7 @@ export class AnimatedSprite extends Sprite {
   /**
    * Get the current playback state
    */
-  getState(): AnimationState {
+  getState(): AnimatedSpriteAnimationState {
     return this.state;
   }
 
@@ -240,21 +241,21 @@ export class AnimatedSprite extends Sprite {
    * Check if the animation is currently playing
    */
   isPlaying(): boolean {
-    return this.state === AnimationState.Playing;
+    return this.state === AnimatedSpriteAnimationState.Playing;
   }
 
   /**
    * Check if the animation is paused
    */
   isPaused(): boolean {
-    return this.state === AnimationState.Paused;
+    return this.state === AnimatedSpriteAnimationState.Paused;
   }
 
   /**
    * Check if the animation is stopped
    */
   isStopped(): boolean {
-    return this.state === AnimationState.Stopped;
+    return this.state === AnimatedSpriteAnimationState.Stopped;
   }
 
   /**
@@ -293,7 +294,7 @@ export class AnimatedSprite extends Sprite {
     if (animation && !this.texture) {
       throw new Error(
         `[AnimatedSprite] Animation "${this.currentAnimationName}" has no texture, and sprite has no base texture. ` +
-        `Either set a texture on the AnimatedSprite or provide a texture in the animation config.`
+          `Either set a texture on the AnimatedSprite or provide a texture in the animation config.`
       );
     }
 
@@ -330,7 +331,10 @@ export class AnimatedSprite extends Sprite {
       shouldFireLoop: false,
     };
 
-    if (this.state !== AnimationState.Playing || !this.currentAnimationName) {
+    if (
+      this.state !== AnimatedSpriteAnimationState.Playing ||
+      !this.currentAnimationName
+    ) {
       return result;
     }
 
@@ -365,7 +369,7 @@ export class AnimatedSprite extends Sprite {
         } else {
           // Animation ended
           this.currentFrameIndex = animation.frames.length - 1;
-          this.state = AnimationState.Stopped;
+          this.state = AnimatedSpriteAnimationState.Stopped;
           result.shouldFireEnd = true;
           this.updateFrame();
           return result;

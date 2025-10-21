@@ -7,6 +7,7 @@ export interface ColorLike {
 
 export class Color {
   private _data: Float32Array;
+  private _onChange?: () => void;
 
   constructor(r: number = 1, g: number = 1, b: number = 1, a: number = 1) {
     this._data = new Float32Array(4);
@@ -16,12 +17,20 @@ export class Color {
     this._data[3] = Math.max(0, Math.min(1, a));
   }
 
+  /**
+   * Set a callback that will be called whenever this color changes
+   */
+  public setOnChange(callback: (() => void) | undefined): void {
+    this._onChange = callback;
+  }
+
   get r(): number {
     return this._data[0];
   }
 
   set r(value: number) {
     this._data[0] = Math.max(0, Math.min(1, value));
+    this._onChange?.();
   }
 
   get g(): number {
@@ -30,6 +39,7 @@ export class Color {
 
   set g(value: number) {
     this._data[1] = Math.max(0, Math.min(1, value));
+    this._onChange?.();
   }
 
   get b(): number {
@@ -38,6 +48,7 @@ export class Color {
 
   set b(value: number) {
     this._data[2] = Math.max(0, Math.min(1, value));
+    this._onChange?.();
   }
 
   get a(): number {
@@ -46,6 +57,7 @@ export class Color {
 
   set a(value: number) {
     this._data[3] = Math.max(0, Math.min(1, value));
+    this._onChange?.();
   }
 
   get data(): Float32Array {
@@ -74,6 +86,7 @@ export class Color {
     this._data[1] = Math.max(0, Math.min(1, g));
     this._data[2] = Math.max(0, Math.min(1, b));
     this._data[3] = Math.max(0, Math.min(1, a));
+    this._onChange?.();
     return this;
   }
 

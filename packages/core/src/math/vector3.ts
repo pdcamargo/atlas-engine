@@ -9,6 +9,7 @@ export interface Vector3Like {
 
 export class Vector3 {
   private _data: Float32Array;
+  private _onChange?: () => void;
 
   constructor(x: number = 0, y: number = 0, z: number = 0) {
     this._data = new Float32Array(3);
@@ -17,12 +18,21 @@ export class Vector3 {
     this._data[2] = z;
   }
 
+  /**
+   * Set a callback that will be called whenever this vector changes
+   * Useful for notifying parent objects (like SceneNode) that transforms need updating
+   */
+  public setOnChange(callback: (() => void) | undefined): void {
+    this._onChange = callback;
+  }
+
   get x(): number {
     return this._data[0];
   }
 
   set x(value: number) {
     this._data[0] = value;
+    this._onChange?.();
   }
 
   get y(): number {
@@ -31,6 +41,7 @@ export class Vector3 {
 
   set y(value: number) {
     this._data[1] = value;
+    this._onChange?.();
   }
 
   get z(): number {
@@ -39,6 +50,7 @@ export class Vector3 {
 
   set z(value: number) {
     this._data[2] = value;
+    this._onChange?.();
   }
 
   get data(): Float32Array {
@@ -53,6 +65,7 @@ export class Vector3 {
     } else {
       vec3.set(this._data, other.x, other.y, this.z);
     }
+    this._onChange?.();
     return this;
   }
 
@@ -64,6 +77,7 @@ export class Vector3 {
     this._data[0] = x;
     this._data[1] = y;
     this._data[2] = z;
+    this._onChange?.();
     return this;
   }
 

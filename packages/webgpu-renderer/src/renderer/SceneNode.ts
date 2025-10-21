@@ -50,6 +50,10 @@ export class SceneNode {
     } else {
       this.id = uuidv4();
     }
+
+    // Set up change callbacks so animations can mark the node dirty
+    this.position.setOnChange(() => this.markDirty());
+    this.scale.setOnChange(() => this.markDirty());
   }
 
   /**
