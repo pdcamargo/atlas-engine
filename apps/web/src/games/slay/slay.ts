@@ -9,14 +9,9 @@ import {
   Color,
   OrthographicCamera,
   Rect,
-  FlexContainer,
-  UiContainer,
-  QueryBuilder,
   WebgpuRenderer,
   TileMap,
   TileSet,
-  Button,
-  RootContainer,
   AudioClip,
   AudioSource,
   AudioListener,
@@ -26,19 +21,19 @@ import {
   Time,
   TextureFilter,
   AnimatedSprite,
-  Animation,
+  AnimatedSpriteAnimation,
   OutlineEffect,
   ShadowEffect,
   VignetteEffect,
   ChromaticAberrationEffect,
   BloomEffect,
-  ParticleEmitter,
   ParticlePresets,
+  SunLight,
+  PointLight,
+  SpotLight,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
-
-class RendererDebug {}
 
 export class SlayGamePlugin implements EcsPlugin {
   build(app: App) {
@@ -182,31 +177,31 @@ export class SlayGamePlugin implements EcsPlugin {
           },
         ];
 
-        const runDownAnimation = new Animation({
+        const runDownAnimation = new AnimatedSpriteAnimation({
           frames: frames2,
           loop: true,
           texture: textureHandle,
         });
 
-        const runUpAnimation = new Animation({
+        const runUpAnimation = new AnimatedSpriteAnimation({
           frames: frames2,
           loop: true,
           texture: textureHandle2,
         });
 
-        const runRightAnimation = new Animation({
+        const runRightAnimation = new AnimatedSpriteAnimation({
           frames: frames2,
           loop: true,
           texture: textureHandle4,
         });
 
-        const runLeftAnimation = new Animation({
+        const runLeftAnimation = new AnimatedSpriteAnimation({
           frames: frames2,
           loop: true,
           texture: textureHandle3,
         });
 
-        for (let i = 0; i < 111; i++) {
+        for (let i = 0; i < 256; i++) {
           const animatedSprite = new AnimatedSprite(null, 0.5, 0.5);
 
           animatedSprite.addAnimation("runDown", runDownAnimation);
@@ -239,16 +234,35 @@ export class SlayGamePlugin implements EcsPlugin {
               thickness: 0.02,
               order: -1, // Render before sprite
             });
+            outlineEffect.enabled = false;
             animatedSprite.addEffect(outlineEffect);
           }
 
           commands.spawn(animatedSprite, nearestFilter);
           sceneGraph.addRoot(animatedSprite);
 
-          animatedSprite.setPosition({
+          const pos = {
             x: Math.random() * 5 - 2.5,
             y: Math.random() * 5 - 2.5,
-          });
+          };
+
+          animatedSprite.setPosition(pos);
+
+          commands.spawn(PointLight.torch(pos.x, pos.y, 1));
+
+          // commands.spawn(
+          //   new PointLight(
+          //     {
+          //       x: pos.x,
+          //       y: pos.y,
+          //       z: 1,
+          //     },
+          //     Color.white(),
+          //     1.05,
+          //     3,
+          //     1
+          //   )
+          // );
         }
 
         // Create camera
@@ -296,7 +310,7 @@ export class SlayGamePlugin implements EcsPlugin {
 
         const magicEffect = ParticlePresets.magic({ intensity: 0.17 });
         magicEffect.setPosition({ x: 0, y: 0, z: 0 });
-        sceneGraph.addRoot(magicEffect);
+        // sceneGraph.addRoot(magicEffect);
         commands.spawn(magicEffect);
 
         // Add post-processing effects to renderer
@@ -308,6 +322,7 @@ export class SlayGamePlugin implements EcsPlugin {
           smoothness: 0.3,
           order: 0,
         });
+        vignetteEffect.enabled = false;
         renderer.addPostProcessEffect(vignetteEffect);
 
         // Add chromatic aberration (RGB split for retro look)
@@ -315,6 +330,7 @@ export class SlayGamePlugin implements EcsPlugin {
           offset: 0.006,
           order: 1,
         });
+        chromaticAberrationEffect.enabled = false;
         renderer.addPostProcessEffect(chromaticAberrationEffect);
 
         // Add bloom effect (makes bright areas glow)
@@ -326,6 +342,10 @@ export class SlayGamePlugin implements EcsPlugin {
           order: 2,
         });
         renderer.addPostProcessEffect(bloomEffect);
+
+        commands.spawn(
+          new SunLight({ x: 0, y: 0, z: -1 }, Color.white(), 0.01)
+        );
       })
       .addUpdateSystems(({ commands }) => {
         const [, camera] = commands

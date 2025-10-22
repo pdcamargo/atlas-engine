@@ -134,7 +134,7 @@ export class UiDemoPlugin implements EcsPlugin {
           fontFamily: "Arial, sans-serif",
           letterSpacing: "2px",
         }),
-        new TextColor("#ffffff"),
+        new TextColor({ color: "#ffffff" }),
         new TextAlign({ textAlign: "center" }),
         new Spacing({
           margin: { bottom: 40 },
@@ -185,7 +185,7 @@ export class UiDemoPlugin implements EcsPlugin {
           fontSize: 12,
           fontFamily: "Arial, sans-serif",
         }),
-        new TextColor("rgba(255, 255, 255, 0.5)"),
+        new TextColor({ color: "rgba(255, 255, 255, 0.5)" }),
         new TextAlign({ textAlign: "center" }),
         new Spacing({
           margin: { top: "auto" },
@@ -217,7 +217,7 @@ export class UiDemoPlugin implements EcsPlugin {
           fontFamily: "Arial, sans-serif",
           letterSpacing: "1px",
         }),
-        new TextColor("#ffffff"),
+        new TextColor({ color: "#ffffff" }),
         new TextAlign({ textAlign: "center" }),
         new FlexLayout({
           justifyContent: "center",

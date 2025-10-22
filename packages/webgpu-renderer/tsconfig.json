@@ -5,6 +5,7 @@
   "outDir": "./dist",
   "compilerOptions": {
     "target": "ES2022",
-    "types": ["@webgpu/types"]
+    "types": ["@webgpu/types"],
+    "outDir": "./dist"
   }
 }

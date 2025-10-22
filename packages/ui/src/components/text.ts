@@ -88,7 +88,11 @@ export class TextStyle {
  * Text color component
  */
 export class TextColor {
-  constructor(public color: string = "#000000") {}
+  public color: string = "#000000";
+
+  constructor(config?: { color: string }) {
+    if (config?.color) this.color = config.color;
+  }
 
   public set(color: string): this {
     this.color = color;

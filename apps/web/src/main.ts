@@ -5,13 +5,14 @@ import { UiDemoPlugin } from "./games/ui-demo";
 import "./style.css";
 
 import { App, DebugPlugin, EcsPlugin } from "@atlas/engine";
+import { SlayGamePlugin } from "./games/slay";
 
 // Select which game to run:
 // - "boid" - Flocking simulation (500 boids)
 // - "game-of-life" - Conway's Game of Life (128x128 grid)
 // - "animator-demo" - Comprehensive animator system demonstration
 // - "ui-demo" - UI system demo with game menu
-const GAME: string = "ui-demo";
+const GAME: string = "slay";
 
 async function main() {
   const gamePlugins: Record<string, () => EcsPlugin> = {
@@ -19,6 +20,7 @@ async function main() {
     "game-of-life": () => new GameOfLifePlugin(),
     "animator-demo": () => new AnimatorDemoPlugin(),
     "ui-demo": () => new UiDemoPlugin(),
+    slay: () => new SlayGamePlugin(),
   };
 
   const gamePlugin = (gamePlugins[GAME] ?? gamePlugins["ui-demo"])();

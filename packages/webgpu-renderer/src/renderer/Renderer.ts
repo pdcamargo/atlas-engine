@@ -8,6 +8,8 @@ import { Texture } from "./Texture";
 
 import spriteShaderCode from "./shaders/sprite.wgsl?raw";
 import spriteInstancedShaderCode from "./shaders/sprite_instanced.wgsl?raw";
+import spriteLitShaderCode from "./shaders/sprite_lit.wgsl?raw";
+import spriteLitInstancedShaderCode from "./shaders/sprite_lit_instanced.wgsl?raw";
 import primitiveShaderCode from "./shaders/primitive.wgsl?raw";
 import { ObjectPool } from "@atlas/core";
 import { RenderBatch } from "../batching";
@@ -16,6 +18,8 @@ import { TileMapBatch } from "./tilemap/TileMapBatch";
 import { LRUCache } from "../utils/LRUCache";
 import { PostProcessEffect } from "../post-processing/PostProcessEffect";
 import { ParticleEmitter } from "../particles/ParticleEmitter";
+import { LightingSystem, MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS } from "../ecs/resources/lighting-system";
+import { DEFAULT_SPRITE_MATERIAL } from "../materials/SpriteMaterial";
 
 interface RendererOptions {
   canvas?: HTMLCanvasElement;
@@ -32,6 +36,8 @@ export class WebgpuRenderer {
   // Pipelines
   private spritePipeline!: GPURenderPipeline;
   private spriteInstancedPipeline!: GPURenderPipeline;
+  private spriteLitPipeline!: GPURenderPipeline;
+  private spriteLitInstancedPipeline!: GPURenderPipeline;
   private primitivePipeline!: GPURenderPipeline;
 
   private uniformBufferPool?: ObjectPool<GPUBuffer>;
@@ -58,7 +64,19 @@ export class WebgpuRenderer {
   // Cache bind group layouts (created once, reused)
   private spriteBindGroupLayout?: GPUBindGroupLayout;
   private spriteInstancedBindGroupLayout?: GPUBindGroupLayout;
+  private spriteLitBindGroupLayout?: GPUBindGroupLayout;
+  private spriteLitInstancedBindGroupLayout?: GPUBindGroupLayout;
   private primitiveBindGroupLayout?: GPUBindGroupLayout;
+
+  // Lighting system buffers
+  private lightingUniformBuffer?: GPUBuffer;
+  private pointLightsStorageBuffer?: GPUBuffer;
+  private spotLightsStorageBuffer?: GPUBuffer;
+  private lightingBindGroup?: GPUBindGroup; // For lit sprite pipeline
+  private lightingBindGroupInstanced?: GPUBindGroup; // For lit instanced sprite pipeline
+  private lightingBindGroupLayout?: GPUBindGroupLayout;
+  private lightingBindGroupLayoutInstanced?: GPUBindGroupLayout;
+  public lightingSystem?: LightingSystem; // Set by ECS plugin
 
   // Batch management for instanced rendering
   private batches = new Map<string, RenderBatch>(); // textureId -> RenderBatch
@@ -221,8 +239,14 @@ export class WebgpuRenderer {
     this.spriteBindGroupLayout = this.spritePipeline.getBindGroupLayout(0);
     this.spriteInstancedBindGroupLayout =
       this.spriteInstancedPipeline.getBindGroupLayout(0);
+    this.spriteLitBindGroupLayout = this.spriteLitPipeline.getBindGroupLayout(0);
+    this.spriteLitInstancedBindGroupLayout =
+      this.spriteLitInstancedPipeline.getBindGroupLayout(0);
     this.primitiveBindGroupLayout =
       this.primitivePipeline.getBindGroupLayout(0);
+
+    // Initialize lighting system buffers
+    this.initializeLightingBuffers();
 
     // Initialize post-processing effects
     for (const effect of this.postProcessEffects) {
@@ -308,6 +332,75 @@ export class WebgpuRenderer {
       },
     });
 
+    // Lit sprite pipeline
+    const spriteLitShaderModule = this.device.createShaderModule({
+      label: "Lit Sprite Shader",
+      code: spriteLitShaderCode,
+    });
+
+    const spriteLitCompilationInfo =
+      await spriteLitShaderModule.getCompilationInfo();
+    for (const message of spriteLitCompilationInfo.messages) {
+      if (message.type === "error") {
+        console.error(
+          `Lit sprite shader error: ${message.message} at line ${message.lineNum}`
+        );
+      }
+    }
+
+    this.spriteLitPipeline = this.device.createRenderPipeline({
+      label: "Lit Sprite Pipeline",
+      layout: "auto",
+      vertex: {
+        module: spriteLitShaderModule,
+        entryPoint: "vertexMain",
+        buffers: this.quadBuffers.bufferLayouts,
+      },
+      fragment: {
+        module: spriteLitShaderModule,
+        entryPoint: "fragmentMain",
+        targets: [{ format: this.format, blend: this.getAlphaBlendState() }],
+      },
+      primitive: {
+        topology: "triangle-list",
+      },
+    });
+
+    // Lit instanced sprite pipeline
+    const spriteLitInstancedShaderModule = this.device.createShaderModule({
+      label: "Lit Instanced Sprite Shader",
+      code: spriteLitInstancedShaderCode,
+    });
+
+    const spriteLitInstancedCompilationInfo =
+      await spriteLitInstancedShaderModule.getCompilationInfo();
+    for (const message of spriteLitInstancedCompilationInfo.messages) {
+      if (message.type === "error") {
+        console.error(
+          `Lit instanced sprite shader error: ${message.message} at line ${message.lineNum}`
+        );
+      }
+    }
+
+    this.spriteLitInstancedPipeline = this.device.createRenderPipeline({
+      label: "Lit Instanced Sprite Pipeline",
+      layout: "auto",
+      vertex: {
+        module: spriteLitInstancedShaderModule,
+        entryPoint: "vertexMain",
+        buffers: this.quadBuffers.bufferLayouts,
+      },
+      fragment: {
+        module: spriteLitInstancedShaderModule,
+        entryPoint: "fragmentMain",
+        targets: [{ format: this.format, blend: this.getAlphaBlendState() }],
+      },
+      primitive: {
+        topology: "triangle-list",
+        cullMode: "back",
+      },
+    });
+
     // Primitive pipeline
     const primitiveShaderModule = this.device.createShaderModule({
       label: "Primitive Shader",
@@ -370,6 +463,132 @@ export class WebgpuRenderer {
       this.textureViewCache.set(texture.id, texture.gpuTexture.createView());
     }
     return this.textureViewCache.get(texture.id)!;
+  }
+
+  /**
+   * Initialize lighting system buffers
+   */
+  private initializeLightingBuffers(): void {
+    // Create lighting uniform buffer (64 bytes)
+    this.lightingUniformBuffer = this.device.createBuffer({
+      size: LightingSystem.getUniformBufferSize(),
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      label: "Lighting Uniforms",
+    });
+
+    // Create point lights storage buffer (48 bytes per light * MAX_POINT_LIGHTS)
+    this.pointLightsStorageBuffer = this.device.createBuffer({
+      size: LightingSystem.getPointLightSize() * MAX_POINT_LIGHTS,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      label: "Point Lights Storage",
+    });
+
+    // Create spot lights storage buffer (64 bytes per light * MAX_SPOT_LIGHTS)
+    this.spotLightsStorageBuffer = this.device.createBuffer({
+      size: LightingSystem.getSpotLightSize() * MAX_SPOT_LIGHTS,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      label: "Spot Lights Storage",
+    });
+
+    // Initialize buffers with default data immediately
+    // This prevents validation errors when lit sprites are rendered before lighting system updates
+    const defaultUniforms = new Float32Array(16);
+    if (this.lightingSystem) {
+      this.lightingSystem.writeUniformsToArray(defaultUniforms, 0);
+    } else {
+      // Default: ambient (0.2, 0.2, 0.2, 0.2), sun disabled, no lights
+      defaultUniforms.set([0.2, 0.2, 0.2, 0.2], 0); // ambient
+      defaultUniforms.set([0, -1, 0, 0], 4); // sun direction (intensity 0 = disabled)
+      defaultUniforms.set([1, 1, 1, 0], 8); // sun color
+      defaultUniforms.set([0, 0, 0, 0], 12); // numPointLights, numSpotLights, padding
+    }
+    this.device.queue.writeBuffer(this.lightingUniformBuffer, 0, defaultUniforms);
+
+    // Initialize storage buffers with empty data
+    const emptyPointLights = new Float32Array(LightingSystem.getPointLightSize() / 4);
+    this.device.queue.writeBuffer(this.pointLightsStorageBuffer, 0, emptyPointLights);
+
+    const emptySpotLights = new Float32Array(LightingSystem.getSpotLightSize() / 4);
+    this.device.queue.writeBuffer(this.spotLightsStorageBuffer, 0, emptySpotLights);
+
+    // Get bind group layouts from both lit pipelines (group 1)
+    this.lightingBindGroupLayout = this.spriteLitPipeline.getBindGroupLayout(1);
+    this.lightingBindGroupLayoutInstanced = this.spriteLitInstancedPipeline.getBindGroupLayout(1);
+
+    // Create lighting bind group for lit sprite pipeline
+    this.lightingBindGroup = this.device.createBindGroup({
+      label: "Lighting Bind Group (Sprite)",
+      layout: this.lightingBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.lightingUniformBuffer } },
+        { binding: 1, resource: { buffer: this.pointLightsStorageBuffer } },
+        { binding: 2, resource: { buffer: this.spotLightsStorageBuffer } },
+      ],
+    });
+
+    // Create lighting bind group for lit instanced sprite pipeline
+    this.lightingBindGroupInstanced = this.device.createBindGroup({
+      label: "Lighting Bind Group (Instanced)",
+      layout: this.lightingBindGroupLayoutInstanced,
+      entries: [
+        { binding: 0, resource: { buffer: this.lightingUniformBuffer } },
+        { binding: 1, resource: { buffer: this.pointLightsStorageBuffer } },
+        { binding: 2, resource: { buffer: this.spotLightsStorageBuffer } },
+      ],
+    });
+  }
+
+  /**
+   * Update lighting buffers from LightingSystem
+   */
+  private updateLightingBuffers(): void {
+    if (!this.lightingSystem) {
+      return; // No lighting system
+    }
+
+    // Skip if not dirty (after first frame)
+    if (!this.lightingSystem.isDirty()) {
+      return;
+    }
+
+    const lighting = this.lightingSystem;
+
+    // Write lighting uniforms (64 bytes) - always write, even with no lights
+    const uniformData = new Float32Array(16); // 64 bytes / 4 = 16 floats
+    lighting.writeUniformsToArray(uniformData, 0);
+    this.device.queue.writeBuffer(this.lightingUniformBuffer!, 0, uniformData);
+
+    // Always initialize storage buffers (even if empty) for shader compatibility
+    // Write point lights
+    const pointLightsSize = Math.max(1, lighting.numPointLights); // At least 1 to avoid empty buffer
+    const pointLightsData = new Float32Array(
+      (LightingSystem.getPointLightSize() / 4) * pointLightsSize
+    );
+    if (lighting.numPointLights > 0) {
+      lighting.writePointLightsToArray(pointLightsData, 0);
+    }
+    this.device.queue.writeBuffer(
+      this.pointLightsStorageBuffer!,
+      0,
+      pointLightsData
+    );
+
+    // Write spot lights
+    const spotLightsSize = Math.max(1, lighting.numSpotLights); // At least 1 to avoid empty buffer
+    const spotLightsData = new Float32Array(
+      (LightingSystem.getSpotLightSize() / 4) * spotLightsSize
+    );
+    if (lighting.numSpotLights > 0) {
+      lighting.writeSpotLightsToArray(spotLightsData, 0);
+    }
+    this.device.queue.writeBuffer(
+      this.spotLightsStorageBuffer!,
+      0,
+      spotLightsData
+    );
+
+    // Mark as clean
+    lighting.markClean();
   }
 
   /**
@@ -480,6 +699,9 @@ export class WebgpuRenderer {
     // Update batches (add/remove sprites as needed)
     this.updateBatches(sceneGraph);
 
+    // Update lighting buffers if needed
+    this.updateLightingBuffers();
+
     // Get view-projection matrix
     const vpMatrix = camera.getViewProjectionMatrix();
 
@@ -568,6 +790,15 @@ export class WebgpuRenderer {
     batch: RenderBatch,
     camera: Camera
   ): void {
+    // Check if this is a lit sprite batch
+    const isLit = batch.material.shader.name === "LitSprite";
+
+    // If lit but lighting not ready, skip this batch
+    if (isLit && !this.lightingBindGroupInstanced) {
+      console.warn("Lit instanced sprites require lighting system to be initialized");
+      return;
+    }
+
     if (!this.spriteInstancedBindGroupLayout || !this.vpMatrixBuffer) {
       throw new Error("Instanced pipeline not initialized");
     }
@@ -625,14 +856,25 @@ export class WebgpuRenderer {
     // If dirtyRanges.length === 0, skip upload (nothing changed)
 
     // Create or get cached bind group (same pattern as tilemap)
-    // Cache key: textureId_bufferId (buffer ID changes when buffer is recreated)
+    // Cache key: textureId_bufferId_lit (buffer ID changes when buffer is recreated)
     const bufferId = batch.getBufferId();
-    const cacheKey = `${batch.texture.id}_${bufferId}`;
+    const cacheKey = `${batch.texture.id}_${bufferId}_${isLit ? "lit" : "unlit"}`;
+
+    // Select pipeline and get its bind group layout
+    const pipeline = isLit
+      ? this.spriteLitInstancedPipeline
+      : this.spriteInstancedPipeline;
+
+    // IMPORTANT: When using layout: "auto", each pipeline gets its own unique layout
+    // We must use the bind group layout from the specific pipeline we're rendering with
+    const bindGroupLayout = isLit
+      ? this.spriteLitInstancedBindGroupLayout!
+      : this.spriteInstancedBindGroupLayout;
 
     let bindGroup = this.bindGroupCache.get(cacheKey);
     if (!bindGroup) {
       bindGroup = this.device.createBindGroup({
-        layout: this.spriteInstancedBindGroupLayout,
+        layout: bindGroupLayout,
         entries: [
           { binding: 0, resource: { buffer: this.vpMatrixBuffer } }, // VP matrix uniform
           { binding: 1, resource: { buffer: instanceBuffer } }, // Instance data storage
@@ -644,8 +886,14 @@ export class WebgpuRenderer {
     }
 
     // Draw instanced
-    renderPass.setPipeline(this.spriteInstancedPipeline);
+    renderPass.setPipeline(pipeline);
     renderPass.setBindGroup(0, bindGroup);
+
+    // For lit sprites, also bind the lighting data (group 1)
+    // Use the bind group that matches the pipeline
+    if (isLit && this.lightingBindGroupInstanced) {
+      renderPass.setBindGroup(1, this.lightingBindGroupInstanced);
+    }
     for (let i = 0; i < this.quadBuffers.bufferLayouts.length; i++) {
       renderPass.setVertexBuffer(i, this.quadBuffers.buffers[i]);
     }
@@ -695,6 +943,14 @@ export class WebgpuRenderer {
   ): void {
     if (!sprite.texture || !(sprite.texture instanceof Texture)) return;
 
+    // Check if this is a lit sprite
+    const isLit = sprite.material.shader.name === "LitSprite";
+
+    // If lit but lighting not ready, skip this sprite
+    if (isLit && !this.lightingBindGroup) {
+      return;
+    }
+
     // Compute MVP matrix using pooled matrices
     const modelMatrix = sprite.getWorldMatrix();
 
@@ -726,10 +982,19 @@ export class WebgpuRenderer {
     this.matrixPool.release(scaledModel);
     this.matrixPool.release(mvpMatrix);
 
+    // Select pipeline and get its bind group layout
+    const pipeline = isLit ? this.spriteLitPipeline : this.spritePipeline;
+
+    // IMPORTANT: When using layout: "auto", each pipeline gets its own unique layout
+    // We must use the bind group layout from the specific pipeline we're rendering with
+    const bindGroupLayout = isLit
+      ? this.spriteLitBindGroupLayout!
+      : this.spriteBindGroupLayout;
+
     // Create bind group for this draw call
     // Note: Cannot cache bind groups with dynamic uniform buffers
     const bindGroup = this.device.createBindGroup({
-      layout: this.spriteBindGroupLayout,
+      layout: bindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: uniformBuffer, size: 96 } },
         { binding: 1, resource: sprite.texture.sampler },
@@ -738,8 +1003,13 @@ export class WebgpuRenderer {
     });
 
     // Draw
-    renderPass.setPipeline(this.spritePipeline);
+    renderPass.setPipeline(pipeline);
     renderPass.setBindGroup(0, bindGroup);
+
+    // For lit sprites, also bind the lighting data (group 1)
+    if (isLit && this.lightingBindGroup) {
+      renderPass.setBindGroup(1, this.lightingBindGroup);
+    }
     for (let i = 0; i < this.quadBuffers.bufferLayouts.length; i++) {
       renderPass.setVertexBuffer(i, this.quadBuffers.buffers[i]);
     }
@@ -1023,6 +1293,28 @@ export class WebgpuRenderer {
       throw new Error("Instanced pipeline not initialized");
     }
 
+    // Ensure tilemap has a material (for backwards compatibility)
+    if (!tileMap.material) {
+      tileMap.material = DEFAULT_SPRITE_MATERIAL;
+    }
+
+    // Check if this tilemap uses lit material
+    const isLit = tileMap.material.shader.name === "LitSprite";
+
+    // If lit but lighting not ready, skip rendering
+    if (isLit && !this.lightingBindGroupInstanced) {
+      console.warn("Lit tilemaps require lighting system to be initialized");
+      return;
+    }
+
+    // Select the correct pipeline and bind group layout based on material
+    const pipeline = isLit
+      ? this.spriteLitInstancedPipeline
+      : this.spriteInstancedPipeline;
+    const bindGroupLayout = isLit
+      ? this.spriteLitInstancedBindGroupLayout!
+      : this.spriteInstancedBindGroupLayout;
+
     const needsFullRebuild = tileMap.isDirty();
 
     if (needsFullRebuild) {
@@ -1059,6 +1351,11 @@ export class WebgpuRenderer {
     for (const chunk of visibleChunks) {
       if (chunk.isEmpty()) continue;
 
+      // Bind lighting data for lit tilemaps (group 1)
+      if (isLit && this.lightingBindGroupInstanced) {
+        renderPass.setBindGroup(1, this.lightingBindGroupInstanced);
+      }
+
       // Render the chunk (handles all batches within the chunk)
       chunk.render(
         renderPass,
@@ -1067,8 +1364,8 @@ export class WebgpuRenderer {
         worldMatrix,
         tileMap.tileWidth,
         tileMap.tileHeight,
-        this.spriteInstancedPipeline,
-        this.spriteInstancedBindGroupLayout,
+        pipeline,
+        bindGroupLayout,
         this.quadBuffers,
         this.textureViewCache,
         this.bindGroupCache,

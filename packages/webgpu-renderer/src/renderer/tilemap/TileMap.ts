@@ -4,6 +4,8 @@ import { TileSet } from "./TileSet";
 import { Tile } from "./Tile";
 import { Color } from "@atlas/core";
 import { TileMapChunk, ChunkBounds } from "./TileMapChunk";
+import { Material } from "../../materials/Material";
+import { DEFAULT_SPRITE_MATERIAL } from "../../materials/SpriteMaterial";
 
 export interface TileMapOptions {
   tileWidth: number;
@@ -20,6 +22,7 @@ export class TileMap extends SceneNode {
   public readonly tileWidth: number;
   public readonly tileHeight: number;
   public readonly chunkSize: number;
+  public material: Material = DEFAULT_SPRITE_MATERIAL; // Material for tilemap rendering
 
   private layers: Map<string, TileMapLayer> = new Map();
   private layerOrder: string[] = []; // Maintain layer rendering order

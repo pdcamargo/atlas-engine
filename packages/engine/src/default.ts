@@ -1,16 +1,18 @@
 import {
+  App,
   AssetsPlugin,
   EcsPlugin,
   EcsPluginGroup,
   FileSystemAdapter,
   FileSystemPlugin,
   InputPlugin,
+  Time,
   TimePlugin,
   ViewportPlugin,
 } from "@atlas/core";
 import { WebgpuRendererPlugin } from "@atlas/webgpu-renderer";
 import { AudioPlugin } from "@atlas/audio";
-import { UiPlugin } from "@atlas/ui";
+import { Position, Text, TextBundle, UiPlugin, UiRoot } from "@atlas/ui";
 
 export type DefaultPluginOptions = {
   container?: HTMLElement | null;
@@ -37,5 +39,42 @@ export class DefaultPlugin implements EcsPluginGroup {
       new AudioPlugin(),
       new UiPlugin(),
     ];
+  }
+}
+
+class FpsMarker {}
+
+export class DebugPlugin implements EcsPlugin {
+  constructor() {}
+
+  build(app: App) {
+    app
+      .addStartupSystems(({ commands }) => {
+        commands
+          .spawnBundle(TextBundle, {
+            text: ["Hello, World!"],
+            textStyle: [{ fontSize: 24, fontWeight: "bold" }],
+            textColor: [{ color: "white" }],
+            textAlign: [{ textAlign: "center" }],
+          })
+          .insert(
+            new Position({
+              position: "absolute",
+              top: 0,
+              right: 0,
+            }),
+            new UiRoot(),
+            new FpsMarker()
+          );
+      })
+      .addUpdateSystems(({ commands }) => {
+        const time = commands.getResource(Time);
+
+        const [, fpsText] = commands.query(Text, FpsMarker).find();
+
+        if (fpsText) {
+          fpsText.content = `FPS: ${time.fps.toFixed(2)}`;
+        }
+      });
   }
 }

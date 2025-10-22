@@ -2,6 +2,7 @@ import { Shader } from "./Shader";
 import { Material, BlendMode } from "./Material";
 import spriteShaderCode from "../renderer/shaders/sprite.wgsl?raw";
 import spriteInstancedShaderCode from "../renderer/shaders/sprite_instanced.wgsl?raw";
+import { LitSpriteMaterial } from "./LitSpriteMaterial";
 
 /**
  * Default sprite shader (singleton)
@@ -46,4 +47,4 @@ export class SpriteMaterial extends Material {
  * Singleton default sprite material
  * Shared by all sprites that don't specify a custom material
  */
-export const DEFAULT_SPRITE_MATERIAL = new SpriteMaterial();
+export const DEFAULT_SPRITE_MATERIAL = new LitSpriteMaterial();
