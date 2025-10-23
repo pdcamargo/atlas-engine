@@ -59,7 +59,10 @@ export class HandleSerializer implements CustomSerializer {
     const assetIdString = data[SerializationMarkers.ASSET_ID];
     const assetId = AssetId.fromString(assetIdString);
 
-    if (data[SerializationMarkers.WEAK_HANDLE]) {
+    if (
+      SerializationMarkers.WEAK_HANDLE in data &&
+      data[SerializationMarkers.WEAK_HANDLE]
+    ) {
       return createWeakHandle(assetId);
     }
 

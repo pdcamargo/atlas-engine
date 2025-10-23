@@ -11,11 +11,18 @@ export class Vector3 {
   private _data: Float32Array;
   private _onChange?: () => void;
 
-  constructor(x: number = 0, y: number = 0, z: number = 0) {
+  constructor(
+    x: number = 0,
+    y: number = 0,
+    z: number = 0,
+    onChange?: () => void
+  ) {
     this._data = new Float32Array(3);
     this._data[0] = x;
     this._data[1] = y;
     this._data[2] = z;
+
+    this._onChange = onChange;
   }
 
   /**
@@ -77,6 +84,7 @@ export class Vector3 {
     this._data[0] = x;
     this._data[1] = y;
     this._data[2] = z;
+
     this._onChange?.();
     return this;
   }
@@ -89,6 +97,9 @@ export class Vector3 {
       this._data[1] += other.y;
       this._data[2] += other.z;
     }
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -100,17 +111,27 @@ export class Vector3 {
       this._data[1] -= other.y;
       this._data[2] -= other.z;
     }
+
+    this._onChange?.();
+
     return this;
   }
 
   multiply(scalar: number): Vector3 {
     vec3.scale(this._data, this._data, scalar);
+
+    this._onChange?.();
+
     return this;
   }
 
   divide(scalar: number): Vector3 {
     if (scalar === 0) throw new Error("Division by zero");
+
     vec3.scale(this._data, this._data, 1 / scalar);
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -118,6 +139,7 @@ export class Vector3 {
     if (other instanceof Vector3) {
       return vec3.dot(this._data, other._data);
     }
+
     return this.x * other.x + this.y * other.y + this.z * other.z;
   }
 
@@ -130,6 +152,9 @@ export class Vector3 {
       const z = this.x * other.y - this.y * other.x;
       this.set(x, y, z);
     }
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -174,11 +199,17 @@ export class Vector3 {
       this._data[1] = this.y + (other.y - this.y) * t;
       this._data[2] = this.z + (other.z - this.z) * t;
     }
+
+    this._onChange?.();
+
     return this;
   }
 
   negate(): Vector3 {
     vec3.negate(this._data, this._data);
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -300,12 +331,12 @@ export class Vector3 {
     if (a instanceof Vector3 && b instanceof Vector3) {
       return vec3.dot(a._data, b._data);
     }
-    const ax = a instanceof Vector3 ? a.x : a.x;
-    const ay = a instanceof Vector3 ? a.y : a.y;
-    const az = a instanceof Vector3 ? a.z : a.z;
-    const bx = b instanceof Vector3 ? b.x : b.x;
-    const by = b instanceof Vector3 ? b.y : b.y;
-    const bz = b instanceof Vector3 ? b.z : b.z;
+    const ax = a.x;
+    const ay = a.y;
+    const az = a.z;
+    const bx = b.x;
+    const by = b.y;
+    const bz = b.z;
     return ax * bx + ay * by + az * bz;
   }
 
@@ -314,20 +345,21 @@ export class Vector3 {
     if (a instanceof Vector3 && b instanceof Vector3) {
       vec3.cross(result._data, a._data, b._data);
     } else {
-      const ax = a instanceof Vector3 ? a.x : a.x;
-      const ay = a instanceof Vector3 ? a.y : a.y;
-      const az = a instanceof Vector3 ? a.z : a.z;
-      const bx = b instanceof Vector3 ? b.x : b.x;
-      const by = b instanceof Vector3 ? b.y : b.y;
-      const bz = b instanceof Vector3 ? b.z : b.z;
+      const ax = a.x;
+      const ay = a.y;
+      const az = a.z;
+      const bx = b.x;
+      const by = b.y;
+      const bz = b.z;
       result.set(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
     }
+
     return result;
   }
 
   static length(a: Vector3 | Vector3Like): number {
     if (a instanceof Vector3) {
-      return vec3.length(a._data);
+      return vec3.magnitude(a._data);
     }
     return Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
   }
@@ -336,6 +368,7 @@ export class Vector3 {
     if (a instanceof Vector3) {
       return vec3.squaredLength(a._data);
     }
+
     return a.x * a.x + a.y * a.y + a.z * a.z;
   }
 
@@ -355,12 +388,12 @@ export class Vector3 {
     if (a instanceof Vector3 && b instanceof Vector3) {
       return vec3.distance(a._data, b._data);
     }
-    const ax = a instanceof Vector3 ? a.x : a.x;
-    const ay = a instanceof Vector3 ? a.y : a.y;
-    const az = a instanceof Vector3 ? a.z : a.z;
-    const bx = b instanceof Vector3 ? b.x : b.x;
-    const by = b instanceof Vector3 ? b.y : b.y;
-    const bz = b instanceof Vector3 ? b.z : b.z;
+    const ax = a.x;
+    const ay = a.y;
+    const az = a.z;
+    const bx = b.x;
+    const by = b.y;
+    const bz = b.z;
     const dx = ax - bx;
     const dy = ay - by;
     const dz = az - bz;
@@ -374,12 +407,12 @@ export class Vector3 {
     if (a instanceof Vector3 && b instanceof Vector3) {
       return vec3.squaredDistance(a._data, b._data);
     }
-    const ax = a instanceof Vector3 ? a.x : a.x;
-    const ay = a instanceof Vector3 ? a.y : a.y;
-    const az = a instanceof Vector3 ? a.z : a.z;
-    const bx = b instanceof Vector3 ? b.x : b.x;
-    const by = b instanceof Vector3 ? b.y : b.y;
-    const bz = b instanceof Vector3 ? b.z : b.z;
+    const ax = a.x;
+    const ay = a.y;
+    const az = a.z;
+    const bx = b.x;
+    const by = b.y;
+    const bz = b.z;
     const dx = ax - bx;
     const dy = ay - by;
     const dz = az - bz;
@@ -395,12 +428,12 @@ export class Vector3 {
     if (a instanceof Vector3 && b instanceof Vector3) {
       vec3.lerp(result._data, a._data, b._data, t);
     } else {
-      const ax = a instanceof Vector3 ? a.x : a.x;
-      const ay = a instanceof Vector3 ? a.y : a.y;
-      const az = a instanceof Vector3 ? a.z : a.z;
-      const bx = b instanceof Vector3 ? b.x : b.x;
-      const by = b instanceof Vector3 ? b.y : b.y;
-      const bz = b instanceof Vector3 ? b.z : b.z;
+      const ax = a.x;
+      const ay = a.y;
+      const az = a.z;
+      const bx = b.x;
+      const by = b.y;
+      const bz = b.z;
       result.set(ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t);
     }
     return result;
@@ -426,12 +459,12 @@ export class Vector3 {
         vec3.exactEquals(a._data, b._data) || vec3.equals(a._data, b._data)
       );
     }
-    const ax = a instanceof Vector3 ? a.x : a.x;
-    const ay = a instanceof Vector3 ? a.y : a.y;
-    const az = a instanceof Vector3 ? a.z : a.z;
-    const bx = b instanceof Vector3 ? b.x : b.x;
-    const by = b instanceof Vector3 ? b.y : b.y;
-    const bz = b instanceof Vector3 ? b.z : b.z;
+    const ax = a.x;
+    const ay = a.y;
+    const az = a.z;
+    const bx = b.x;
+    const by = b.y;
+    const bz = b.z;
     return (
       Math.abs(ax - bx) < epsilon &&
       Math.abs(ay - by) < epsilon &&

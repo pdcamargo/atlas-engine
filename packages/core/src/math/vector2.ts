@@ -6,12 +6,14 @@ export interface Vector2Like {
 }
 
 export class Vector2 {
-  private _data: Float32Array;
+  _data: Float32Array;
+  _onChange?: () => void;
 
-  constructor(x: number = 0, y: number = 0) {
+  constructor(x: number = 0, y: number = 0, onChange?: () => void) {
     this._data = new Float32Array(2);
     this._data[0] = x;
     this._data[1] = y;
+    this._onChange = onChange;
   }
 
   get x(): number {
@@ -19,7 +21,10 @@ export class Vector2 {
   }
 
   set x(value: number) {
-    this._data[0] = value;
+    if (this._data[0] !== value) {
+      this._data[0] = value;
+      this._onChange?.();
+    }
   }
 
   get y(): number {
@@ -27,7 +32,10 @@ export class Vector2 {
   }
 
   set y(value: number) {
-    this._data[1] = value;
+    if (this._data[1] !== value) {
+      this._data[1] = value;
+      this._onChange?.();
+    }
   }
 
   get data(): Float32Array {
@@ -42,6 +50,9 @@ export class Vector2 {
       this._data[0] = other.x;
       this._data[1] = other.y;
     }
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -52,6 +63,9 @@ export class Vector2 {
   set(x: number, y: number): Vector2 {
     this._data[0] = x;
     this._data[1] = y;
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -62,6 +76,8 @@ export class Vector2 {
       this._data[0] += other.x;
       this._data[1] += other.y;
     }
+
+    this._onChange?.();
     return this;
   }
 
@@ -72,17 +88,26 @@ export class Vector2 {
       this._data[0] -= other.x;
       this._data[1] -= other.y;
     }
+
+    this._onChange?.();
+
     return this;
   }
 
   multiply(scalar: number): Vector2 {
     vec2.scale(this._data, this._data, scalar);
+
+    this._onChange?.();
+
     return this;
   }
 
   divide(scalar: number): Vector2 {
     if (scalar === 0) throw new Error("Division by zero");
     vec2.scale(this._data, this._data, 1 / scalar);
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -90,6 +115,7 @@ export class Vector2 {
     if (other instanceof Vector2) {
       return vec2.dot(this._data, other._data);
     }
+
     return this.x * other.x + this.y * other.y;
   }
 
@@ -97,11 +123,12 @@ export class Vector2 {
     if (other instanceof Vector2) {
       return this.x * other.y - this.y * other.x;
     }
+
     return this.x * other.y - this.y * other.x;
   }
 
   length(): number {
-    return vec2.length(this._data);
+    return vec2.magnitude(this._data);
   }
 
   lengthSquared(): number {
@@ -117,8 +144,10 @@ export class Vector2 {
     if (other instanceof Vector2) {
       return vec2.distance(this._data, other._data);
     }
+
     const dx = this.x - other.x;
     const dy = this.y - other.y;
+
     return Math.sqrt(dx * dx + dy * dy);
   }
 
@@ -126,8 +155,10 @@ export class Vector2 {
     if (other instanceof Vector2) {
       return vec2.squaredDistance(this._data, other._data);
     }
+
     const dx = this.x - other.x;
     const dy = this.y - other.y;
+
     return dx * dx + dy * dy;
   }
 
@@ -138,11 +169,17 @@ export class Vector2 {
       this._data[0] = this.x + (other.x - this.x) * t;
       this._data[1] = this.y + (other.y - this.y) * t;
     }
+
+    this._onChange?.();
+
     return this;
   }
 
   negate(): Vector2 {
     vec2.negate(this._data, this._data);
+
+    this._onChange?.();
+
     return this;
   }
 
@@ -153,6 +190,7 @@ export class Vector2 {
         vec2.equals(this._data, other._data)
       );
     }
+
     return (
       Math.abs(this.x - other.x) < epsilon &&
       Math.abs(this.y - other.y) < epsilon

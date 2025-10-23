@@ -10,13 +10,21 @@ export interface QuaternionLike {
 
 export class Quaternion {
   private _data: Float32Array;
+  private _onChange?: () => void;
 
-  constructor(x: number = 0, y: number = 0, z: number = 0, w: number = 1) {
+  constructor(
+    x: number = 0,
+    y: number = 0,
+    z: number = 0,
+    w: number = 1,
+    onChange?: () => void
+  ) {
     this._data = new Float32Array(4);
     this._data[0] = x;
     this._data[1] = y;
     this._data[2] = z;
     this._data[3] = w;
+    this._onChange = onChange;
   }
 
   get x(): number {
@@ -25,6 +33,7 @@ export class Quaternion {
 
   set x(value: number) {
     this._data[0] = value;
+    this._onChange?.();
   }
 
   get y(): number {
@@ -33,6 +42,7 @@ export class Quaternion {
 
   set y(value: number) {
     this._data[1] = value;
+    this._onChange?.();
   }
 
   get z(): number {
@@ -41,6 +51,7 @@ export class Quaternion {
 
   set z(value: number) {
     this._data[2] = value;
+    this._onChange?.();
   }
 
   get w(): number {
@@ -49,6 +60,7 @@ export class Quaternion {
 
   set w(value: number) {
     this._data[3] = value;
+    this._onChange?.();
   }
 
   get data(): Float32Array {
@@ -58,6 +70,7 @@ export class Quaternion {
   // Instance methods
   copyFrom(other: Quaternion | QuaternionLike): Quaternion {
     quat.set(this._data, other.x, other.y, other.z, other.w);
+    this._onChange?.();
     return this;
   }
 
@@ -67,13 +80,13 @@ export class Quaternion {
 
   fromEuler(x: number, y: number, z: number): Quaternion {
     quat.fromEuler(this._data, x, y, z);
-
+    this._onChange?.();
     return this;
   }
 
   rotate2D(angle: number): Quaternion {
     quat.rotateY(this._data, this._data, angle);
-
+    this._onChange?.();
     return this;
   }
 
@@ -82,6 +95,7 @@ export class Quaternion {
     this._data[1] = y;
     this._data[2] = z;
     this._data[3] = w;
+    this._onChange?.();
     return this;
   }
 
@@ -94,6 +108,7 @@ export class Quaternion {
       this._data[2] += other.z;
       this._data[3] += other.w;
     }
+    this._onChange?.();
     return this;
   }
 
@@ -102,7 +117,7 @@ export class Quaternion {
     this._data[1] -= other.y;
     this._data[2] -= other.z;
     this._data[3] -= other.w;
-
+    this._onChange?.();
     return this;
   }
 
@@ -132,11 +147,13 @@ export class Quaternion {
         this.z * other.z;
       this.set(qx, qy, qz, qw);
     }
+    this._onChange?.();
     return this;
   }
 
   scale(scalar: number): Quaternion {
     quat.scale(this._data, this._data, scalar);
+    this._onChange?.();
     return this;
   }
 
@@ -159,16 +176,19 @@ export class Quaternion {
 
   normalize(): Quaternion {
     quat.normalize(this._data, this._data);
+    this._onChange?.();
     return this;
   }
 
   conjugate(): Quaternion {
     quat.conjugate(this._data, this._data);
+    this._onChange?.();
     return this;
   }
 
   invert(): Quaternion {
     quat.invert(this._data, this._data);
+    this._onChange?.();
     return this;
   }
 
@@ -200,6 +220,7 @@ export class Quaternion {
         this.w * t1 + other.w * t2
       );
     }
+    this._onChange?.();
     return this;
   }
 
@@ -212,6 +233,7 @@ export class Quaternion {
       this._data[2] = this.z + (other.z - this.z) * t;
       this._data[3] = this.w + (other.w - this.w) * t;
     }
+    this._onChange?.();
     return this;
   }
 
@@ -220,6 +242,7 @@ export class Quaternion {
     this._data[1] = -this._data[1];
     this._data[2] = -this._data[2];
     this._data[3] = -this._data[3];
+    this._onChange?.();
     return this;
   }
 
@@ -260,16 +283,19 @@ export class Quaternion {
     } else {
       quat.setAxisAngle(this._data, [axis.x, axis.y, axis.z], angle);
     }
+    this._onChange?.();
     return this;
   }
 
   setFromEulerAngles(x: number, y: number, z: number): Quaternion {
     quat.fromEuler(this._data, x, y, z);
+    this._onChange?.();
     return this;
   }
 
   setFromRotationMatrix(matrix: Float32Array | number[]): Quaternion {
     quat.fromMat3(this._data, matrix as Mat3Like);
+    this._onChange?.();
     return this;
   }
 

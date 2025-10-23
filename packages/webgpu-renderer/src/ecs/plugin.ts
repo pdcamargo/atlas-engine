@@ -1,4 +1,10 @@
-import { createSet, SystemType, type App, type EcsPlugin } from "@atlas/core";
+import {
+  createSet,
+  SerializationRegistry,
+  SystemType,
+  type App,
+  type EcsPlugin,
+} from "@atlas/core";
 
 import { GpuRenderDevice } from "./resources/render-device";
 import { GpuPresentationFormat } from "./resources/presentation-format";
@@ -14,6 +20,8 @@ import { tileMapAnimationUpdateSystem } from "./systems/tilemap-animation-update
 import { particleUpdateSystem } from "./systems/particle-update";
 import { lightingUpdateSystem } from "./systems/lighting-update";
 import { TextureCache } from "./resources/texture-cache";
+import { MaterialSerializer } from "../serialization";
+import { Material } from "../materials";
 
 const ResizeSystem = Symbol("WebgpuRenderer::PreUpdate");
 const LoadingSystem = Symbol("WebgpuRenderer::TextureLoading");
@@ -30,6 +38,10 @@ export class WebgpuRendererPlugin implements EcsPlugin {
   constructor(private readonly options?: WebgpuRendererPluginOptions) {}
 
   public async build(app: App) {
+    const materialSerializer = new MaterialSerializer();
+    SerializationRegistry.registerSerializer(materialSerializer);
+    SerializationRegistry.registerTypeSerializer(Material, materialSerializer);
+
     const renderer = new WebgpuRenderer({
       canvas: this.options?.canvas,
     });

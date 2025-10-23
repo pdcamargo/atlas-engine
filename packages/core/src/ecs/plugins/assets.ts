@@ -7,8 +7,6 @@ import {
   Handle,
 } from "../..";
 
-import { Howl } from "howler";
-
 /**
  * 2D Texture asset (framework-agnostic)
  * Just holds raw image data that can be used by any renderer
@@ -77,9 +75,6 @@ export class ImageLoader implements AssetLoader<ImageAsset> {
       const img = new Image();
       img.crossOrigin = "anonymous";
 
-      // Disable image smoothing for pixel-perfect rendering
-      img.style.imageRendering = "pixelated";
-
       img.onload = () => {
         URL.revokeObjectURL(url);
         resolve(img);
@@ -96,65 +91,6 @@ export class ImageLoader implements AssetLoader<ImageAsset> {
 }
 
 /**
- * Sound asset (Howler.js-based)
- */
-export class Sound {
-  #howl: Howl;
-
-  constructor(howl: Howl) {
-    this.#howl = howl;
-  }
-
-  public get howl(): Howl {
-    return this.#howl;
-  }
-
-  public play(): number {
-    return this.#howl.play();
-  }
-
-  public pause(id?: number): void {
-    this.#howl.pause(id);
-  }
-
-  public stop(id?: number): void {
-    this.#howl.stop(id);
-  }
-
-  public isPlaying(id?: number): boolean {
-    return this.#howl.playing(id);
-  }
-}
-
-/**
- * Asset loader for sounds (MP3, WAV, OGG, etc.)
- */
-export class SoundLoader implements AssetLoader<Sound> {
-  extensions(): string[] {
-    return ["mp3", "wav", "ogg", "webm", "m4a"];
-  }
-
-  async load(bytes: Uint8Array, _path: string): Promise<Sound> {
-    const blob = new Blob([bytes as any]);
-    const url = URL.createObjectURL(blob);
-
-    return new Promise<Sound>((resolve, reject) => {
-      const howl = new Howl({
-        src: [url],
-        onload: () => {
-          URL.revokeObjectURL(url);
-          resolve(new Sound(howl));
-        },
-        onloaderror: (_id, error) => {
-          URL.revokeObjectURL(url);
-          reject(new Error(`Failed to load sound: ${error}`));
-        },
-      });
-    });
-  }
-}
-
-/**
  * Plugin that sets up the asset system with default loaders
  */
 export class AssetsPlugin implements EcsPlugin {
@@ -163,19 +99,16 @@ export class AssetsPlugin implements EcsPlugin {
   public async build(app: App) {
     // Create asset storage for each type
     const texture2DAssets = new Assets<ImageAsset>();
-    const soundAssets = new Assets<Sound>();
 
     // Create asset server
     const assetServer = new AssetServer();
 
     // Register default loaders
     assetServer.registerLoader(new ImageLoader());
-    assetServer.registerLoader(new SoundLoader());
 
     // Register resources
     app.setResource(assetServer);
     app.setResource(texture2DAssets);
-    app.setResource(soundAssets);
   }
 }
 

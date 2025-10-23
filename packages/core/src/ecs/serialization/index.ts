@@ -8,7 +8,11 @@ export { Serializer } from "./serializer";
 export { SerializationRegistry } from "./registry";
 
 // Decorators
-export { Serializable, SerializeProperty, makeSerializable } from "./decorators";
+export {
+  Serializable,
+  SerializeProperty,
+  makeSerializable,
+} from "./decorators";
 
 // Types
 export type {
@@ -26,11 +30,4 @@ export type {
 export { SerializationMarkers } from "./types";
 
 // Built-in serializers
-export {
-  HandleSerializer,
-  EntityRefSerializer,
-  PointSerializer,
-  ChildrenSerializer,
-  TransformSerializer,
-  registerBuiltInSerializers,
-} from "./serializers";
+export * from "./serializers";

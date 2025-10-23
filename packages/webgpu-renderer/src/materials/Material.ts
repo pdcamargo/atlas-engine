@@ -109,7 +109,10 @@ export class Material {
   /**
    * Get or create bind group layout for this material
    */
-  getBindGroupLayout(device: GPUDevice, instanced: boolean): GPUBindGroupLayout {
+  getBindGroupLayout(
+    device: GPUDevice,
+    instanced: boolean
+  ): GPUBindGroupLayout {
     const cache = instanced
       ? this._instancedBindGroupLayouts
       : this._bindGroupLayouts;

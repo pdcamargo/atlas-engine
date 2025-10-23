@@ -1,6 +1,13 @@
 import { SceneNode } from "./SceneNode";
 import { Texture } from "./Texture";
-import { Rect, Color, Handle, ImageAsset } from "@atlas/core";
+import {
+  Rect,
+  Color,
+  Handle,
+  ImageAsset,
+  Serializable,
+  SerializeProperty,
+} from "@atlas/core";
 import { Material } from "../materials/Material";
 import { DEFAULT_SPRITE_MATERIAL } from "../materials/SpriteMaterial";
 import { Effect } from "../effects/Effect";
@@ -10,14 +17,25 @@ import { Effect } from "../effects/Effect";
  * Supports both pre-loaded Textures and lazy-loaded Handles
  * Now supports custom materials and visual effects
  */
+@Serializable()
 export class Sprite extends SceneNode {
+  @SerializeProperty({ serializer: "handle", optional: true })
   public texture: Texture | Handle<ImageAsset> | null = null;
+
+  @SerializeProperty()
   public width: number;
+
+  @SerializeProperty()
   public height: number;
+
+  @SerializeProperty()
   public frame: Rect;
+
+  @SerializeProperty()
   public tint: Color;
 
   // Material system
+  @SerializeProperty()
   public material: Material = DEFAULT_SPRITE_MATERIAL;
 
   // Effects system

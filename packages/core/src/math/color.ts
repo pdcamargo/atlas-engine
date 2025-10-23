@@ -9,12 +9,19 @@ export class Color {
   private _data: Float32Array;
   private _onChange?: () => void;
 
-  constructor(r: number = 1, g: number = 1, b: number = 1, a: number = 1) {
+  constructor(
+    r: number = 1,
+    g: number = 1,
+    b: number = 1,
+    a: number = 1,
+    onChange?: () => void
+  ) {
     this._data = new Float32Array(4);
     this._data[0] = Math.max(0, Math.min(1, r));
     this._data[1] = Math.max(0, Math.min(1, g));
     this._data[2] = Math.max(0, Math.min(1, b));
     this._data[3] = Math.max(0, Math.min(1, a));
+    this._onChange = onChange;
   }
 
   /**
@@ -30,6 +37,7 @@ export class Color {
 
   set r(value: number) {
     this._data[0] = Math.max(0, Math.min(1, value));
+
     this._onChange?.();
   }
 
@@ -39,6 +47,7 @@ export class Color {
 
   set g(value: number) {
     this._data[1] = Math.max(0, Math.min(1, value));
+
     this._onChange?.();
   }
 
@@ -48,6 +57,7 @@ export class Color {
 
   set b(value: number) {
     this._data[2] = Math.max(0, Math.min(1, value));
+
     this._onChange?.();
   }
 
@@ -57,6 +67,7 @@ export class Color {
 
   set a(value: number) {
     this._data[3] = Math.max(0, Math.min(1, value));
+
     this._onChange?.();
   }
 
@@ -102,6 +113,7 @@ export class Color {
       this._data[2] = Math.max(0, Math.min(1, this._data[2] + other.b));
       this._data[3] = Math.max(0, Math.min(1, this._data[3] + (other.a ?? 1)));
     }
+
     return this;
   }
 
@@ -117,6 +129,7 @@ export class Color {
       this._data[2] = Math.max(0, Math.min(1, this._data[2] - other.b));
       this._data[3] = Math.max(0, Math.min(1, this._data[3] - (other.a ?? 1)));
     }
+
     return this;
   }
 
@@ -125,6 +138,7 @@ export class Color {
     this._data[1] = Math.max(0, Math.min(1, this._data[1] * scalar));
     this._data[2] = Math.max(0, Math.min(1, this._data[2] * scalar));
     this._data[3] = Math.max(0, Math.min(1, this._data[3] * scalar));
+
     return this;
   }
 
@@ -314,11 +328,11 @@ export class Color {
       const ar = a instanceof Color ? a.r : a.r;
       const ag = a instanceof Color ? a.g : a.g;
       const ab = a instanceof Color ? a.b : a.b;
-      const aa = a instanceof Color ? a.a : a.a ?? 1;
+      const aa = a instanceof Color ? a.a : (a.a ?? 1);
       const br = b instanceof Color ? b.r : b.r;
       const bg = b instanceof Color ? b.g : b.g;
       const bb = b instanceof Color ? b.b : b.b;
-      const ba = b instanceof Color ? b.a : b.a ?? 1;
+      const ba = b instanceof Color ? b.a : (b.a ?? 1);
       result.set(
         Math.max(0, Math.min(1, ar + br)),
         Math.max(0, Math.min(1, ag + bg)),
@@ -340,11 +354,11 @@ export class Color {
       const ar = a instanceof Color ? a.r : a.r;
       const ag = a instanceof Color ? a.g : a.g;
       const ab = a instanceof Color ? a.b : a.b;
-      const aa = a instanceof Color ? a.a : a.a ?? 1;
+      const aa = a instanceof Color ? a.a : (a.a ?? 1);
       const br = b instanceof Color ? b.r : b.r;
       const bg = b instanceof Color ? b.g : b.g;
       const bb = b instanceof Color ? b.b : b.b;
-      const ba = b instanceof Color ? b.a : b.a ?? 1;
+      const ba = b instanceof Color ? b.a : (b.a ?? 1);
       result.set(
         Math.max(0, Math.min(1, ar - br)),
         Math.max(0, Math.min(1, ag - bg)),
@@ -384,11 +398,11 @@ export class Color {
       const ar = a instanceof Color ? a.r : a.r;
       const ag = a instanceof Color ? a.g : a.g;
       const ab = a instanceof Color ? a.b : a.b;
-      const aa = a instanceof Color ? a.a : a.a ?? 1;
+      const aa = a instanceof Color ? a.a : (a.a ?? 1);
       const br = b instanceof Color ? b.r : b.r;
       const bg = b instanceof Color ? b.g : b.g;
       const bb = b instanceof Color ? b.b : b.b;
-      const ba = b instanceof Color ? b.a : b.a ?? 1;
+      const ba = b instanceof Color ? b.a : (b.a ?? 1);
       result.set(
         Math.max(0, Math.min(1, ar * br)),
         Math.max(0, Math.min(1, ag * bg)),
@@ -411,11 +425,11 @@ export class Color {
       const ar = a instanceof Color ? a.r : a.r;
       const ag = a instanceof Color ? a.g : a.g;
       const ab = a instanceof Color ? a.b : a.b;
-      const aa = a instanceof Color ? a.a : a.a ?? 1;
+      const aa = a instanceof Color ? a.a : (a.a ?? 1);
       const br = b instanceof Color ? b.r : b.r;
       const bg = b instanceof Color ? b.g : b.g;
       const bb = b instanceof Color ? b.b : b.b;
-      const ba = b instanceof Color ? b.a : b.a ?? 1;
+      const ba = b instanceof Color ? b.a : (b.a ?? 1);
       result.set(
         ar + (br - ar) * clampedT,
         ag + (bg - ag) * clampedT,
@@ -442,11 +456,11 @@ export class Color {
     const ar = a instanceof Color ? a.r : a.r;
     const ag = a instanceof Color ? a.g : a.g;
     const ab = a instanceof Color ? a.b : a.b;
-    const aa = a instanceof Color ? a.a : a.a ?? 1;
+    const aa = a instanceof Color ? a.a : (a.a ?? 1);
     const br = b instanceof Color ? b.r : b.r;
     const bg = b instanceof Color ? b.g : b.g;
     const bb = b instanceof Color ? b.b : b.b;
-    const ba = b instanceof Color ? b.a : b.a ?? 1;
+    const ba = b instanceof Color ? b.a : (b.a ?? 1);
     return (
       Math.abs(ar - br) < epsilon &&
       Math.abs(ag - bg) < epsilon &&

@@ -1,111 +1,67 @@
 import { mat4 } from "gl-matrix";
+import {
+  Quaternion,
+  type QuaternionLike,
+  Vector2,
+  type Vector2Like,
+} from "../../math";
+import { Serializable, SerializeProperty } from "../serialization";
 
-export class Point {
-  #x: number;
-  #y: number;
-  #onChanged?: () => void;
-
-  constructor(x: number = 0, y: number = 0, onChanged?: () => void) {
-    this.#x = x;
-    this.#y = y;
-    this.#onChanged = onChanged;
-  }
-
-  public get x(): number {
-    return this.#x;
-  }
-
-  public set x(value: number) {
-    if (this.#x !== value) {
-      this.#x = value;
-      this.#onChanged?.();
-    }
-  }
-
-  public get y(): number {
-    return this.#y;
-  }
-
-  public set y(value: number) {
-    if (this.#y !== value) {
-      this.#y = value;
-      this.#onChanged?.();
-    }
-  }
-
-  public copyFrom(point: PointLike | { x: number; y: number }): this {
-    this.x = point.x;
-    this.y = point.y;
-    return this;
-  }
-}
-
-export interface PointLike {
-  x: number;
-  y: number;
-}
-
+@Serializable()
 export class Transform {
-  #position: Point;
-  #rotation: number;
-  #scale: Point;
+  @SerializeProperty()
+  public position: Vector2;
+  @SerializeProperty()
+  public rotation: Quaternion;
+  @SerializeProperty()
+  public scale: Vector2;
 
   #isDirty: boolean;
   #matrix: Float32Array;
 
   constructor(
-    position: { x: number; y: number } = { x: 0, y: 0 },
-    rotation: number = 0,
-    scale: { x: number; y: number } = { x: 1, y: 1 }
+    position: Vector2Like = { x: 0, y: 0 },
+    rotation: QuaternionLike = { x: 0, y: 0, z: 0, w: 1 },
+    scale: Vector2Like = { x: 1, y: 1 },
+    onChange?: () => void
   ) {
     // Create points with callback to mark transform as dirty when they change
-    this.#position = new Point(position.x, position.y, () => {
+    this.position = new Vector2(position.x, position.y, () => {
       this.#isDirty = true;
+      onChange?.();
     });
-    this.#rotation = rotation;
-    this.#scale = new Point(scale.x, scale.y, () => {
+
+    this.rotation = new Quaternion(
+      rotation.x,
+      rotation.y,
+      rotation.z,
+      rotation.w,
+      () => {
+        this.#isDirty = true;
+        onChange?.();
+      }
+    );
+
+    this.scale = new Vector2(scale.x, scale.y, () => {
       this.#isDirty = true;
+      onChange?.();
     });
+
     this.#isDirty = true;
     this.#matrix = mat4.create();
     this.#updateMatrix();
   }
 
-  public get position() {
-    return this.#position;
+  public setPosition(position: Vector2Like) {
+    this.position.copyFrom(position);
   }
 
-  public get rotation() {
-    return this.#rotation;
+  public setRotation(rotation: QuaternionLike) {
+    this.rotation.copyFrom(rotation);
   }
 
-  public get scale() {
-    return this.#scale;
-  }
-
-  public set position(position: PointLike) {
-    this.#position.copyFrom(position);
-    this.#isDirty = true;
-  }
-
-  public setPosition(position: PointLike | { x: number; y: number }) {
-    this.#position.copyFrom(position);
-    this.#isDirty = true;
-  }
-
-  public set rotation(rotation: number) {
-    this.#rotation = rotation;
-    this.#isDirty = true;
-  }
-
-  public setRotation(rotation: number) {
-    this.#rotation = rotation;
-    this.#isDirty = true;
-  }
-
-  public set scale(scale: PointLike) {
-    this.#scale.copyFrom(scale);
-    this.#isDirty = true;
+  public setScale(scale: Vector2Like) {
+    this.scale.copyFrom(scale);
   }
 
   public get isDirty() {
@@ -124,6 +80,7 @@ export class Transform {
       this.#updateMatrix();
       this.#isDirty = false;
     }
+
     return this.#matrix;
   }
 
@@ -134,28 +91,29 @@ export class Transform {
     // Reset to identity
     mat4.identity(this.#matrix);
 
-    // Apply transformations in order: Translate -> Rotate -> Scale
-    mat4.translate(this.#matrix, this.#matrix, [
-      this.#position.x,
-      this.#position.y,
-      0,
-    ]);
-
-    // Rotation around Z axis (for 2D)
-    mat4.rotateZ(this.#matrix, this.#matrix, this.#rotation);
-
-    mat4.scale(this.#matrix, this.#matrix, [this.#scale.x, this.#scale.y, 1]);
+    mat4.fromRotationTranslationScale(
+      this.#matrix,
+      this.rotation.data,
+      this.position.data,
+      this.scale.data
+    );
   }
 
-  public static fromPosition(position: PointLike | { x: number; y: number }) {
+  public static fromPosition(position: Vector2Like) {
     const transform = new Transform();
     transform.setPosition(position);
     return transform;
   }
 
-  public static fromRotation(rotation: number) {
+  public static fromRotation(rotation: QuaternionLike) {
     const transform = new Transform();
-    transform.rotation = rotation;
+    transform.setRotation(rotation);
+    return transform;
+  }
+
+  public static fromScale(scale: Vector2Like) {
+    const transform = new Transform();
+    transform.setScale(scale);
     return transform;
   }
 }

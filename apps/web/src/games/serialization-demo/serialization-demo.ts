@@ -149,6 +149,8 @@ export class SerializationDemoPlugin implements EcsPlugin {
         })
       )
       .addStartupSystems(({ commands }) => {
+        const assetServer = app.getResource(AssetServer);
+        const texture = assetServer.load<ImageAsset>("/texutre-atlas.png");
         const newScene = SceneSerializer.fromJSON(json);
         const newPlayer = commands.spawnScene(newScene);
         commands.spawnScene(newScene);
@@ -163,7 +165,8 @@ export class SerializationDemoPlugin implements EcsPlugin {
           new PlayerData("Player 2"),
           new Health(100, 100),
           new Transform({ x: 200, y: 200 }),
-          new RandomClass()
+          new RandomClass(),
+          new Sprite(texture, 1, 1)
         );
 
         const savedScene = commands.saveScene([newPlayer2.id()]);
