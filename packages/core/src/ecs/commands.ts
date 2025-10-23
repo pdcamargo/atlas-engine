@@ -1,4 +1,5 @@
 import { Children, Parent } from "./components";
+import { Scene, SceneInstance } from "./scene/scene";
 import type { ComponentClass, Entity } from "./types";
 import type { World } from "./world";
 
@@ -208,6 +209,14 @@ export class Commands {
   constructor(app: import("../index").App) {
     this.#world = app.world;
     this.#app = app;
+  }
+
+  public saveScene(entities: Entity[]): Scene {
+    return this.#world.saveScene(entities);
+  }
+
+  public spawnScene(scene: Scene): SceneInstance {
+    return this.#world.spawnScene(scene);
   }
 
   public debugWorld() {

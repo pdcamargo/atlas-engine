@@ -1,5 +1,8 @@
 import { Archetype } from "./archetype";
 import type { ComponentClass, Entity } from "./types";
+import type { Scene, SceneInstance } from "./scene/scene";
+import { SceneSerializer } from "./scene/scene-serializer";
+import { SceneSpawner } from "./scene/spawner";
 
 export class World {
   #nextEntityId: Entity = 1;
@@ -196,6 +199,14 @@ export class World {
     return archetype.hasComponentClass(componentClass);
   }
 
+  public getEntityComponents(
+    entity: Entity
+  ): Map<ComponentClass<unknown>, unknown> | null {
+    const archetype = this.#archetypeByEntity.get(entity);
+    if (!archetype) return null;
+    return archetype.getEntityComponents(entity);
+  }
+
   public removeComponent(
     entity: Entity,
     componentClass: ComponentClass<unknown>
@@ -259,5 +270,23 @@ export class World {
     );
 
     console.log(lines.join("\n"));
+  }
+
+  /**
+   * Save entities to a scene
+   * @param entities List of entity IDs to save
+   * @param metadata Optional metadata for the scene
+   */
+  public saveScene(entities: Entity[], metadata: any = {}): Scene {
+    return SceneSerializer.fromWorld(this, entities, metadata);
+  }
+
+  /**
+   * Spawn a scene into this world
+   * @param scene The scene to spawn
+   * @returns SceneInstance with entity mappings
+   */
+  public spawnScene(scene: Scene): SceneInstance {
+    return SceneSpawner.spawn(this, scene);
   }
 }

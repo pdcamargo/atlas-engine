@@ -22,6 +22,12 @@ export * from "./object-pool";
 export { sys, createSet } from "./ecs/system_builder";
 export type { SystemBuilder } from "./ecs/system_builder";
 
+// Serialization system
+export * from "./ecs/serialization";
+
+// Scene system
+export * from "./ecs/scene";
+
 import { Scheduler } from "./ecs/scheduler";
 import { World as ECSWorld } from "./ecs/world";
 import {
@@ -32,6 +38,7 @@ import {
 import type { EcsPlugin, EcsPluginGroup } from "./plugin";
 import { Events } from "./ecs/events";
 import { EntityAddedEvent } from "./ecs/commands";
+import { registerBuiltInSerializers } from "./ecs/serialization";
 
 export class App {
   #world: ECSWorld;
@@ -41,10 +48,18 @@ export class App {
   #resources: Map<string, unknown> = new Map();
   #events: Events;
 
+  static #serializersRegistered = false;
+
   constructor() {
     this.#world = new ECSWorld();
     this.#scheduler = new Scheduler();
     this.#events = new Events();
+
+    // Auto-register built-in serializers on first App instance
+    if (!App.#serializersRegistered) {
+      registerBuiltInSerializers();
+      App.#serializersRegistered = true;
+    }
   }
 
   public static create() {
