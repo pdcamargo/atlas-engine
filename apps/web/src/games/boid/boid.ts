@@ -12,12 +12,9 @@ import {
   SceneGraph,
   Sprite,
   Color,
-  OrthographicCamera,
   MainCamera,
   Time,
   GpuRenderDevice,
-  AssetServer,
-  ImageAsset,
   TextureFilter,
   Texture,
   PerspectiveCamera,
@@ -35,8 +32,6 @@ import type { ComputeWorkerInstance } from "@atlas/engine";
  * Component to mark the boid simulation worker
  */
 class BoidSimulation {
-  public isReading = false;
-
   constructor(
     public worker: ComputeWorkerInstance,
     public workerBuilder: BoidComputeWorker,
@@ -102,18 +97,16 @@ export class BoidGamePlugin implements EcsPlugin {
         const worker = boidWorker.build(device);
 
         // Check for shader compilation errors (async, won't block initialization)
-        (async () => {
-          const { BoidUpdateShader } = await import("./boid-compute");
-          const shader = new BoidUpdateShader();
-          const messages = await shader.checkCompilation(device);
-          for (const msg of messages) {
-            if (msg.type === "error") {
-              console.error("❌ Boid shader error:", msg.message);
-            } else if (msg.type === "warning") {
-              console.warn("⚠️ Boid shader warning:", msg.message);
-            }
+        const { BoidUpdateShader } = await import("./boid-compute");
+        const shader = new BoidUpdateShader();
+        const messages = await shader.checkCompilation(device);
+        for (const msg of messages) {
+          if (msg.type === "error") {
+            console.error("❌ Boid shader error:", msg.message);
+          } else if (msg.type === "warning") {
+            console.warn("⚠️ Boid shader warning:", msg.message);
           }
-        })();
+        }
 
         // Create sprites for each boid
         const boidSprites: Sprite[] = [];
@@ -167,15 +160,10 @@ export class BoidGamePlugin implements EcsPlugin {
         console.log("  - Watch the boids flock naturally!");
         console.log("  - Try modifying params in BoidSimulation component");
       })
-      .addUpdateSystems(({ commands }) => {
+      .addUpdateSystems(async ({ commands }) => {
         // Update boid simulation
         const [, simulation] = commands.query(BoidSimulation).find();
         const time = commands.getResource(Time);
-
-        // Skip if still reading from previous frame
-        if (simulation.isReading) {
-          return;
-        }
 
         // Update deltaTime in simulation params
         simulation.params.deltaTime = time.deltaTime;
@@ -186,41 +174,31 @@ export class BoidGamePlugin implements EcsPlugin {
           simulation.params
         );
 
-        // Execute compute shader (non-blocking)
-        simulation.worker.execute();
+        // Execute compute shader and read results
+        await simulation.worker.execute();
+        const boidData = await simulation.worker.readTypedArray(
+          "boidsDst",
+          Float32Array
+        );
 
-        // Mark as reading to prevent concurrent reads
-        simulation.isReading = true;
+        // Copy output to input for next frame (ping-pong buffers)
+        simulation.worker.write("boidsSrc", boidData);
 
-        // Read the results asynchronously and update sprites (non-blocking)
-        simulation.worker
-          .readTypedArray("boidsDst", Float32Array)
-          .then((boidData) => {
-            // Copy output to input for next frame (ping-pong buffers)
-            simulation.worker.write("boidsSrc", boidData);
+        // Update sprite positions from boid data
+        for (let i = 0; i < simulation.boidCount; i++) {
+          const offset = i * 4;
+          const x = boidData[offset + 0];
+          const y = boidData[offset + 1];
+          const vx = boidData[offset + 2];
+          const vy = boidData[offset + 3];
 
-            // Update sprite positions from boid data
-            for (let i = 0; i < simulation.boidCount; i++) {
-              const offset = i * 4;
-              const x = boidData[offset + 0];
-              const y = boidData[offset + 1];
-              const vx = boidData[offset + 2];
-              const vy = boidData[offset + 3];
+          const sprite = simulation.sprites[i];
+          sprite.setPosition({ x, y });
 
-              const sprite = simulation.sprites[i];
-              sprite.setPosition({ x, y });
-
-              // Rotate sprite to face direction of movement
-              const angle = Math.atan2(vy, vx);
-              sprite.setRotation(angle);
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to read boid data:", error);
-          })
-          .finally(() => {
-            simulation.isReading = false;
-          });
+          // Rotate sprite to face direction of movement
+          const angle = Math.atan2(vy, vx);
+          sprite.setRotation(angle);
+        }
       });
   }
 }

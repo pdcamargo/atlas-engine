@@ -56,6 +56,7 @@ export type SystemDescriptor = {
   afterSets: Set<SystemSetId>;
   beforeLabels: Set<string>;
   afterLabels: Set<string>;
+  isAsync?: boolean;
 };
 
 export type SystemBuilderInput =

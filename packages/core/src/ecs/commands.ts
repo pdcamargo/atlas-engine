@@ -666,6 +666,14 @@ export class Commands {
     return this.#app.hasResource(cls);
   }
 
+  public isAsyncSystemPending(systemId: string): boolean {
+    return this.#app.isAsyncSystemPending(systemId);
+  }
+
+  public getPendingAsyncSystemsCount(): number {
+    return this.#app.getPendingAsyncSystemsCount();
+  }
+
   public setResource<T extends object>(value: T): this {
     this.#app.setResource(value);
     return this;

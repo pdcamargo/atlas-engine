@@ -144,6 +144,14 @@ export class App {
     return this.#resources.has(cls.name);
   }
 
+  public isAsyncSystemPending(systemId: string): boolean {
+    return this.#scheduler.isAsyncSystemPending(systemId);
+  }
+
+  public getPendingAsyncSystemsCount(): number {
+    return this.#scheduler.getPendingAsyncSystemsCount();
+  }
+
   public async run() {
     this.#preparePlugins();
 

@@ -13,7 +13,7 @@ import { SerializationDemoPlugin } from "./games/serialization-demo/serializatio
 // - "game-of-life" - Conway's Game of Life (128x128 grid)
 // - "animator-demo" - Comprehensive animator system demonstration
 // - "ui-demo" - UI system demo with game menu
-const GAME: string = "serialization-demo";
+const GAME: string = "boid";
 
 async function main() {
   const gamePlugins: Record<string, () => EcsPlugin> = {

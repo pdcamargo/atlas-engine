@@ -25,6 +25,7 @@ export class Scheduler {
   #setAfterLabelsByPhase: Map<string, Map<SystemSetId, Set<string>>> =
     new Map();
   #orderCache: Map<SystemType, ScheduledSystem[]> = new Map();
+  #asyncSystemsPending: Map<SystemId, Promise<void>> = new Map();
 
   #commands?: Commands;
   #events?: Events;
@@ -39,6 +40,11 @@ export class Scheduler {
   public run(type: SystemType, app: import("../index").App): void {
     const ordered = this.#getOrderedSystems(type);
     for (const s of ordered) {
+      // Skip if async system is still pending
+      if (s.isAsync && this.#asyncSystemsPending.has(s.id)) {
+        continue;
+      }
+
       // runIf gate (system-level and set-level, AND semantics)
       const preds: import("./types").RunIfFn[] = [];
       const runIfVal = s.runIf;
@@ -76,11 +82,24 @@ export class Scheduler {
           continue;
         }
       }
-      this.#invokeSystem(s, app);
+
+      const result = this.#invokeSystem(s, app);
+
+      // Track async systems
+      if (s.isAsync && result instanceof Promise) {
+        this.#asyncSystemsPending.set(s.id, result);
+        result
+          .catch((error) => {
+            console.error(`Async system ${s.id} failed:`, error);
+          })
+          .finally(() => {
+            this.#asyncSystemsPending.delete(s.id);
+          });
+      }
     }
   }
 
-  #invokeSystem(s: ScheduledSystem, app: import("../index").App): void {
+  #invokeSystem(s: ScheduledSystem, app: import("../index").App): void | Promise<void> {
     const target = s.target ?? null;
     const fn = s.fn;
 
@@ -99,9 +118,9 @@ export class Scheduler {
     };
     const ctx = { commands, events: eventsApi } as const;
     if (target) {
-      (fn as SystemFn).call(target, ctx);
+      return (fn as SystemFn).call(target, ctx);
     } else {
-      (fn as SystemFn)(ctx);
+      return (fn as SystemFn)(ctx);
     }
   }
 
@@ -119,6 +138,14 @@ export class Scheduler {
         SystemType.PostRender,
       ].includes(s.type)
     );
+  }
+
+  public isAsyncSystemPending(systemId: SystemId): boolean {
+    return this.#asyncSystemsPending.has(systemId);
+  }
+
+  public getPendingAsyncSystemsCount(): number {
+    return this.#asyncSystemsPending.size;
   }
 
   public addSetRunIf(
@@ -221,6 +248,7 @@ export class Scheduler {
 
   #normalize(input: SystemBuilderInput): SystemDescriptor {
     if (typeof input === "function") {
+      const isAsync = input.constructor.name === "AsyncFunction";
       return {
         id: this.#makeId(input),
         fn: input,
@@ -233,10 +261,12 @@ export class Scheduler {
         afterSets: new Set(),
         beforeLabels: new Set(),
         afterLabels: new Set(),
+        isAsync,
       } as SystemDescriptor;
     }
     if (Array.isArray(input)) {
       const [target, fn] = input;
+      const isAsync = fn.constructor.name === "AsyncFunction";
       return {
         id: this.#makeId(fn),
         fn,
@@ -249,6 +279,7 @@ export class Scheduler {
         afterSets: new Set(),
         beforeLabels: new Set(),
         afterLabels: new Set(),
+        isAsync,
       } as SystemDescriptor;
     }
     return input;

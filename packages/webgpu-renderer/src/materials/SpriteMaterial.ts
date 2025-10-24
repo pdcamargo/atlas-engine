@@ -47,4 +47,4 @@ export class SpriteMaterial extends Material {
  * Singleton default sprite material
  * Shared by all sprites that don't specify a custom material
  */
-export const DEFAULT_SPRITE_MATERIAL = new LitSpriteMaterial();
+export const DEFAULT_SPRITE_MATERIAL = new SpriteMaterial();

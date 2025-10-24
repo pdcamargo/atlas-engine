@@ -35,7 +35,6 @@ import type { ComputeWorkerInstance } from "@atlas/engine";
  * Game of Life simulation state
  */
 class GameOfLifeSimulation {
-  public isReading = false;
   public isPaused = false;
   public generation = 0;
   public stepMode = false; // If true, only advance one step at a time
@@ -194,7 +193,7 @@ export class GameOfLifePlugin implements EcsPlugin {
         console.log("  C - Clear");
         console.log("  S - Single step (when paused)");
       })
-      .addUpdateSystems(({ commands }) => {
+      .addUpdateSystems(async ({ commands }) => {
         const [, simulation] = commands.query(GameOfLifeSimulation).find();
         const time = commands.getResource(Time);
         const input = commands.getResource(Input);
@@ -204,11 +203,6 @@ export class GameOfLifePlugin implements EcsPlugin {
 
         // Skip if paused (unless in step mode)
         if (simulation.isPaused && !simulation.stepMode) {
-          return;
-        }
-
-        // Skip if still reading from previous frame
-        if (simulation.isReading) {
           return;
         }
 
@@ -230,58 +224,48 @@ export class GameOfLifePlugin implements EcsPlugin {
         // Reset step mode
         simulation.stepMode = false;
 
-        // Execute compute shader (non-blocking)
-        simulation.worker.execute();
+        // Execute compute shader and read results
+        await simulation.worker.execute();
+        const cellData = await simulation.worker.readTypedArray(
+          "next",
+          Uint32Array
+        );
 
-        // Mark as reading to prevent concurrent reads
-        simulation.isReading = true;
+        // Count alive cells for debugging
+        const aliveCount = cellData.reduce((sum, cell) => sum + cell, 0);
 
-        // Read the results asynchronously and update sprites
-        simulation.worker
-          .readTypedArray("next", Uint32Array)
-          .then((cellData) => {
-            // Count alive cells for debugging
-            const aliveCount = cellData.reduce((sum, cell) => sum + cell, 0);
+        // Copy output to input for next generation (ping-pong buffers)
+        simulation.worker.write("current", cellData);
 
-            // Copy output to input for next generation (ping-pong buffers)
-            simulation.worker.write("current", cellData);
+        // Update sprite colors based on cell state
+        const aliveColor = new Color(0.2, 1.0, 0.4);
+        const deadColor = new Color(0.1, 0.1, 0.1);
 
-            // Update sprite colors based on cell state
-            const aliveColor = new Color(0.2, 1.0, 0.4);
-            const deadColor = new Color(0.1, 0.1, 0.1);
+        let updatedCount = 0;
+        for (let i = 0; i < cellData.length; i++) {
+          const sprite = simulation.sprites[i];
+          const newColor = cellData[i] === 1 ? aliveColor : deadColor;
+          sprite.setTint(newColor);
 
-            let updatedCount = 0;
-            for (let i = 0; i < cellData.length; i++) {
-              const sprite = simulation.sprites[i];
-              const newColor = cellData[i] === 1 ? aliveColor : deadColor;
-              sprite.setTint(newColor); // Now properly marks sprite as dirty
+          if (cellData[i] === 1) updatedCount++;
+        }
 
-              if (cellData[i] === 1) updatedCount++;
-            }
+        // Increment generation counter
+        simulation.generation++;
 
-            // Increment generation counter
-            simulation.generation++;
+        if (simulation.generation % 10 === 0) {
+          console.log(
+            `Generation ${simulation.generation}: ${aliveCount} alive cells (updated ${updatedCount} sprites)`
+          );
 
-            if (simulation.generation % 10 === 0) {
-              console.log(
-                `Generation ${simulation.generation}: ${aliveCount} alive cells (updated ${updatedCount} sprites)`
-              );
-
-              // Debug: Check first sprite's state
-              const firstSprite = simulation.sprites[0];
-              console.log(
-                `  First sprite tint:`,
-                firstSprite.getTint?.() || "no getTint method"
-              );
-              console.log(`  First cell state: ${cellData[0]}`);
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to read Game of Life data:", error);
-          })
-          .finally(() => {
-            simulation.isReading = false;
-          });
+          // Debug: Check first sprite's state
+          const firstSprite = simulation.sprites[0];
+          console.log(
+            `  First sprite tint:`,
+            firstSprite.getTint?.() || "no getTint method"
+          );
+          console.log(`  First cell state: ${cellData[0]}`);
+        }
       });
   }
 
