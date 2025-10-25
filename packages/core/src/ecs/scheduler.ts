@@ -99,6 +99,74 @@ export class Scheduler {
     }
   }
 
+  public async runAsync(type: SystemType, app: import("../index").App): Promise<void> {
+    const ordered = this.#getOrderedSystems(type);
+    const asyncPromises: Promise<void>[] = [];
+
+    for (const s of ordered) {
+      // Skip if async system is still pending
+      if (s.isAsync && this.#asyncSystemsPending.has(s.id)) {
+        continue;
+      }
+
+      // runIf gate (system-level and set-level, AND semantics)
+      const preds: import("./types").RunIfFn[] = [];
+      const runIfVal = s.runIf;
+      if (Array.isArray(runIfVal)) {
+        preds.push(...runIfVal);
+      } else if (runIfVal) {
+        preds.push(runIfVal as unknown as import("./types").RunIfFn);
+      }
+      for (const setId of s.sets) {
+        const arrAll = this.#getSetRunIf("*", setId);
+        const arrPhase = this.#getSetRunIf(type, setId);
+        if (arrAll) {
+          preds.push(...arrAll);
+        }
+        if (arrPhase) {
+          preds.push(...arrPhase);
+        }
+      }
+      if (preds.length > 0) {
+        const ctx = {
+          commands: this.#commands ?? new Commands(app),
+          events: (this.#events ??
+            app.events) as unknown as import("./events").EventsApi,
+        } as const;
+        let ok = true;
+        for (const p of preds) {
+          // runIf predicates are now synchronous only
+          const result = p(ctx);
+          if (!result) {
+            ok = false;
+            break;
+          }
+        }
+        if (!ok) {
+          continue;
+        }
+      }
+
+      const result = this.#invokeSystem(s, app);
+
+      // Track async systems and collect promises for parallel execution
+      if (s.isAsync && result instanceof Promise) {
+        const trackedPromise = result
+          .catch((error) => {
+            console.error(`Async system ${s.id} failed:`, error);
+          })
+          .finally(() => {
+            this.#asyncSystemsPending.delete(s.id);
+          });
+        this.#asyncSystemsPending.set(s.id, trackedPromise);
+        asyncPromises.push(trackedPromise);
+      }
+    }
+
+    // Wait for all async systems to complete in parallel
+    await Promise.all(asyncPromises);
+  }
+
   #invokeSystem(s: ScheduledSystem, app: import("../index").App): void | Promise<void> {
     const target = s.target ?? null;
     const fn = s.fn;

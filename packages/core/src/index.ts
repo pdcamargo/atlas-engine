@@ -158,7 +158,7 @@ export class App {
     await this.#finishPlugins();
     await this.#cleanupPlugins();
 
-    this.#scheduler.run(ESystemType.StartUp, this);
+    await this.#scheduler.runAsync(ESystemType.StartUp, this);
 
     // Main loop wrapped in a Promise that resolves when no systems are stepping anymore
     await new Promise<void>((resolve) => {
