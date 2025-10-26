@@ -8,6 +8,7 @@ import {
   Sprite,
   Color,
   OrthographicCamera,
+  PerspectiveCamera,
   Rect,
   WebgpuRenderer,
   TileMap,
@@ -244,6 +245,7 @@ export class SlayGamePlugin implements EcsPlugin {
           const pos = {
             x: Math.random() * 5 - 2.5,
             y: Math.random() * 5 - 2.5,
+            z: 0,
           };
 
           animatedSprite.setPosition(pos);
@@ -266,10 +268,11 @@ export class SlayGamePlugin implements EcsPlugin {
         }
 
         // Create camera
-        const camera = new OrthographicCamera(-1, 1, -1, 1, 0.1, 100);
+        // const camera = new OrthographicCamera(1, 0.1, 100); // size = 1 (half-height)
+        const camera = new PerspectiveCamera(Math.PI / 4, 1, 0.1, 100); // size = 1 (half-height)
         camera.position.set(0, 0, 5);
-        camera.target.set(0, 0, 0);
-        camera.markViewDirty();
+        // camera.rotation.set(0, Math.PI / 4, 0);
+        // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 
         commands.spawn(camera, new MainCamera());
         commands.spawn(sceneGraph);
@@ -349,7 +352,8 @@ export class SlayGamePlugin implements EcsPlugin {
       })
       .addUpdateSystems(({ commands }) => {
         const [, camera] = commands
-          .query(OrthographicCamera, MainCamera)
+          // .query(OrthographicCamera, MainCamera)
+          .query(PerspectiveCamera, MainCamera)
           .find();
         const input = commands.getResource(Input);
         const time = commands.getResource(Time);
@@ -360,30 +364,20 @@ export class SlayGamePlugin implements EcsPlugin {
 
         if (input.pressed(KeyCode.ArrowLeft)) {
           camera.position.x -= cameraMove;
-          camera.target.x -= cameraMove;
-
           camera.markViewDirty();
         }
         if (input.pressed(KeyCode.ArrowRight)) {
           camera.position.x += cameraMove;
-          camera.target.x += cameraMove;
-
           camera.markViewDirty();
         }
         if (input.pressed(KeyCode.ArrowUp)) {
           camera.position.y += cameraMove;
-          camera.target.y += cameraMove;
-
           camera.markViewDirty();
         }
         if (input.pressed(KeyCode.ArrowDown)) {
           camera.position.y -= cameraMove;
-          camera.target.y -= cameraMove;
-
           camera.markViewDirty();
         }
-
-        camera.markViewDirty();
 
         // Note: Distortion effect update removed since we're not using it anymore
       });

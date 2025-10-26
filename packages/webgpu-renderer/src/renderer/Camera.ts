@@ -1,15 +1,19 @@
 import { Mat4, Vector3 } from "@atlas/core";
-import { mat4 } from "gl-matrix";
+import { mat4, quat, vec3 } from "gl-matrix";
 import { Sprite } from "./Sprite";
+import { Frustum } from "./Frustum";
 
 /**
- * Base camera class
+ * Base camera class with Unity-like API
  */
 export abstract class Camera {
   public position: Vector3 = new Vector3();
-  public target: Vector3 = new Vector3();
+  public rotation: Vector3 = new Vector3(); // Euler angles (pitch, yaw, roll) in radians
   public up: Vector3 = new Vector3(0, 1, 0);
+  public enableOcclusionCulling: boolean = true;
+
   protected _aspectRatio: number = 1;
+  protected _frustum: Frustum = new Frustum();
 
   protected _viewMatrix: Mat4 = new Mat4();
   protected _projectionMatrix: Mat4 = new Mat4();
@@ -17,6 +21,7 @@ export abstract class Camera {
   protected _viewDirty: boolean = true;
   protected _projectionDirty: boolean = true;
   protected _viewProjectionDirty: boolean = true;
+  protected _frustumDirty: boolean = true;
 
   /**
    * Mark view matrix as dirty
@@ -24,6 +29,7 @@ export abstract class Camera {
   markViewDirty(): void {
     this._viewDirty = true;
     this._viewProjectionDirty = true;
+    this._frustumDirty = true;
   }
 
   /**
@@ -32,6 +38,7 @@ export abstract class Camera {
   markProjectionDirty(): void {
     this._projectionDirty = true;
     this._viewProjectionDirty = true;
+    this._frustumDirty = true;
   }
 
   /**
@@ -53,15 +60,109 @@ export abstract class Camera {
   }
 
   /**
-   * Update view matrix
+   * Get the forward vector (derived from rotation)
+   */
+  getForward(): Vector3 {
+    const q = quat.create();
+    quat.fromEuler(q, this.rotation.x * (180 / Math.PI), this.rotation.y * (180 / Math.PI), this.rotation.z * (180 / Math.PI));
+
+    const forward = vec3.create();
+    vec3.transformQuat(forward, [0, 0, -1], q);
+
+    return new Vector3(forward[0], forward[1], forward[2]);
+  }
+
+  /**
+   * Get the right vector (derived from rotation)
+   */
+  getRight(): Vector3 {
+    const q = quat.create();
+    quat.fromEuler(q, this.rotation.x * (180 / Math.PI), this.rotation.y * (180 / Math.PI), this.rotation.z * (180 / Math.PI));
+
+    const right = vec3.create();
+    vec3.transformQuat(right, [1, 0, 0], q);
+
+    return new Vector3(right[0], right[1], right[2]);
+  }
+
+  /**
+   * Get the up vector (derived from rotation)
+   */
+  getUp(): Vector3 {
+    const q = quat.create();
+    quat.fromEuler(q, this.rotation.x * (180 / Math.PI), this.rotation.y * (180 / Math.PI), this.rotation.z * (180 / Math.PI));
+
+    const up = vec3.create();
+    vec3.transformQuat(up, [0, 1, 0], q);
+
+    return new Vector3(up[0], up[1], up[2]);
+  }
+
+  /**
+   * Helper method to look at a target point (for easier migration from old API)
+   */
+  lookAt(target: Vector3): void {
+    // Calculate direction from position to target
+    const direction = new Vector3(
+      target.x - this.position.x,
+      target.y - this.position.y,
+      target.z - this.position.z
+    );
+
+    // Calculate rotation from direction
+    const length = Math.sqrt(
+      direction.x * direction.x +
+      direction.y * direction.y +
+      direction.z * direction.z
+    );
+
+    if (length > 0.00001) {
+      direction.x /= length;
+      direction.y /= length;
+      direction.z /= length;
+
+      // Calculate yaw (rotation around Y axis)
+      this.rotation.y = Math.atan2(direction.x, -direction.z);
+
+      // Calculate pitch (rotation around X axis)
+      const horizontalDistance = Math.sqrt(
+        direction.x * direction.x + direction.z * direction.z
+      );
+      this.rotation.x = Math.atan2(direction.y, horizontalDistance);
+
+      // Roll is kept as-is (or could be set to 0)
+      this.markViewDirty();
+    }
+  }
+
+  /**
+   * Update view matrix using position and rotation
    */
   protected updateViewMatrix(): void {
-    mat4.lookAt(
-      this._viewMatrix.data,
-      this.position.data,
-      this.target.data,
-      this.up.data
+    // Create quaternion from euler angles
+    const q = quat.create();
+    quat.fromEuler(
+      q,
+      this.rotation.x * (180 / Math.PI),
+      this.rotation.y * (180 / Math.PI),
+      this.rotation.z * (180 / Math.PI)
     );
+
+    // Create rotation matrix from quaternion
+    const rotationMatrix = mat4.create();
+    mat4.fromQuat(rotationMatrix, q);
+
+    // Create translation matrix
+    const translationMatrix = mat4.create();
+    mat4.fromTranslation(translationMatrix, [
+      -this.position.x,
+      -this.position.y,
+      -this.position.z,
+    ]);
+
+    // View matrix = rotation * translation
+    mat4.multiply(this._viewMatrix.data, rotationMatrix, translationMatrix);
+
     this._viewDirty = false;
   }
 
@@ -104,6 +205,18 @@ export abstract class Camera {
   }
 
   /**
+   * Get the frustum for culling tests
+   */
+  getFrustum(): Frustum {
+    if (this._frustumDirty) {
+      const vp = this.getViewProjectionMatrix();
+      this._frustum.setFromMatrix(vp);
+      this._frustumDirty = false;
+    }
+    return this._frustum;
+  }
+
+  /**
    * Check if a sprite is within the camera's view frustum
    * To be implemented by subclasses
    */
@@ -111,7 +224,7 @@ export abstract class Camera {
 }
 
 /**
- * Perspective camera
+ * Perspective camera with field of view
  */
 export class PerspectiveCamera extends Camera {
   public fov: number;
@@ -162,155 +275,68 @@ export class PerspectiveCamera extends Camera {
 
   /**
    * Check if a sprite is within the perspective camera's view frustum
-   * Uses a simplified frustum test
+   * Uses frustum culling with sphere bounding volume
    */
   isInView(sprite: Sprite): boolean {
-    // Get sprite position in world space from transform matrix
-    const worldMatrix = sprite.getWorldMatrix();
-    const spritePos = {
-      x: worldMatrix[12],
-      y: worldMatrix[13],
-      z: worldMatrix[14],
-    };
-
-    // Calculate view direction
-    const viewDir = {
-      x: this.target.x - this.position.x,
-      y: this.target.y - this.position.y,
-      z: this.target.z - this.position.z,
-    };
-
-    // Vector from camera to sprite
-    const toSprite = {
-      x: spritePos.x - this.position.x,
-      y: spritePos.y - this.position.y,
-      z: spritePos.z - this.position.z,
-    };
-
-    // Distance from camera to sprite
-    const distance = Math.sqrt(
-      toSprite.x * toSprite.x +
-        toSprite.y * toSprite.y +
-        toSprite.z * toSprite.z
-    );
-
-    // Check if within near/far planes
-    if (distance < this.near || distance > this.far) {
-      return false;
+    if (!this.enableOcclusionCulling) {
+      return true;
     }
 
-    // Normalize vectors
-    const viewDirLen = Math.sqrt(
-      viewDir.x * viewDir.x + viewDir.y * viewDir.y + viewDir.z * viewDir.z
-    );
-    viewDir.x /= viewDirLen;
-    viewDir.y /= viewDirLen;
-    viewDir.z /= viewDirLen;
+    // Get sprite position in world space from transform matrix
+    const worldMatrix = sprite.getWorldMatrix();
+    const spritePos = new Vector3(worldMatrix[12], worldMatrix[13], worldMatrix[14]);
 
-    toSprite.x /= distance;
-    toSprite.y /= distance;
-    toSprite.z /= distance;
+    // Calculate sprite bounding sphere radius
+    const radius = Math.sqrt(sprite.width * sprite.width + sprite.height * sprite.height) / 2;
 
-    // Dot product to check if sprite is in front of camera
-    const dot =
-      viewDir.x * toSprite.x + viewDir.y * toSprite.y + viewDir.z * toSprite.z;
-
-    // Calculate frustum bounds at sprite distance
-    const halfFovTan = Math.tan(this.fov / 2);
-    const frustumHeight = 2 * halfFovTan * distance;
-    const frustumWidth = frustumHeight * this._aspectRatio;
-
-    // Sprite bounding box size (account for sprite dimensions)
-    const spriteRadius =
-      Math.sqrt(sprite.width * sprite.width + sprite.height * sprite.height) /
-      2;
-
-    // Simple frustum test with margin
-    return (
-      dot > 0.5 &&
-      Math.abs(toSprite.x) < frustumWidth / 2 + spriteRadius &&
-      Math.abs(toSprite.y) < frustumHeight / 2 + spriteRadius
-    );
+    // Use frustum sphere test
+    const frustum = this.getFrustum();
+    return frustum.containsSphere(spritePos, radius);
   }
 }
 
 /**
- * Orthographic camera
+ * Orthographic camera with size parameter (Unity-like)
  */
 export class OrthographicCamera extends Camera {
-  public left: number;
-  public right: number;
-  public bottom: number;
-  public top: number;
+  public size: number; // Half-height of the orthographic view
   public near: number;
   public far: number;
 
   constructor(
-    left: number = -1,
-    right: number = 1,
-    bottom: number = -1,
-    top: number = 1,
+    size: number = 10,
     near: number = 0.1,
     far: number = 1000
   ) {
     super();
-    this.left = left;
-    this.right = right;
-    this.bottom = bottom;
-    this.top = top;
+    this.size = size;
     this.near = near;
     this.far = far;
     this.markProjectionDirty();
   }
 
   /**
-   * Set orthographic bounds
+   * Get the calculated bounds based on size and aspect ratio
    */
-  setBounds(left: number, right: number, bottom: number, top: number): void {
-    this.left = left;
-    this.right = right;
-    this.bottom = bottom;
-    this.top = top;
-    this.markProjectionDirty();
-  }
+  private getBounds(): { left: number; right: number; bottom: number; top: number } {
+    const height = this.size * 2;
+    const width = height * this._aspectRatio;
 
-  /**
-   * Update bounds to maintain aspect ratio
-   */
-  updateBoundsForAspectRatio(): void {
-    const currentWidth = this.right - this.left;
-    const currentHeight = this.top - this.bottom;
-    const currentAspect = currentWidth / currentHeight;
-
-    if (Math.abs(currentAspect - this._aspectRatio) > 0.001) {
-      // Adjust width to match aspect ratio
-      const newWidth = currentHeight * this._aspectRatio;
-      const centerX = (this.left + this.right) / 2;
-      this.left = centerX - newWidth / 2;
-      this.right = centerX + newWidth / 2;
-      this.markProjectionDirty();
-    }
-  }
-
-  /**
-   * Override setAspectRatio to automatically update bounds
-   */
-  setAspectRatio(aspectRatio: number): void {
-    const isAspectRatioChanged = aspectRatio !== this._aspectRatio;
-    super.setAspectRatio(aspectRatio);
-
-    if (isAspectRatioChanged) {
-      this.updateBoundsForAspectRatio();
-    }
+    return {
+      left: -width / 2,
+      right: width / 2,
+      bottom: -height / 2,
+      top: height / 2,
+    };
   }
 
   protected updateProjectionMatrix(): void {
-    // Create orthographic projection for WebGPU (Z range 0 to 1)
-    // gl-matrix's mat4.ortho creates for OpenGL (Z range -1 to 1)
-    // We need to manually create the correct matrix for WebGPU
+    const bounds = this.getBounds();
+    const { left, right, bottom, top } = bounds;
 
-    const lr = 1 / (this.left - this.right);
-    const bt = 1 / (this.bottom - this.top);
+    // Create orthographic projection for WebGPU (Z range 0 to 1)
+    const lr = 1 / (left - right);
+    const bt = 1 / (bottom - top);
     const nf = 1 / (this.near - this.far);
 
     this._projectionMatrix.data[0] = -2 * lr;
@@ -325,11 +351,11 @@ export class OrthographicCamera extends Camera {
 
     this._projectionMatrix.data[8] = 0;
     this._projectionMatrix.data[9] = 0;
-    this._projectionMatrix.data[10] = nf; // WebGPU uses 0 to 1 for Z, so we use nf instead of 2*nf
+    this._projectionMatrix.data[10] = nf; // WebGPU uses 0 to 1 for Z
     this._projectionMatrix.data[11] = 0;
 
-    this._projectionMatrix.data[12] = (this.left + this.right) * lr;
-    this._projectionMatrix.data[13] = (this.top + this.bottom) * bt;
+    this._projectionMatrix.data[12] = (left + right) * lr;
+    this._projectionMatrix.data[13] = (top + bottom) * bt;
     this._projectionMatrix.data[14] = this.near * nf; // WebGPU: map near to 0
     this._projectionMatrix.data[15] = 1;
 
@@ -338,42 +364,32 @@ export class OrthographicCamera extends Camera {
 
   /**
    * Check if a sprite is within the orthographic camera's view frustum
-   * Uses AABB (Axis-Aligned Bounding Box) intersection test
+   * Uses AABB frustum culling
    */
   isInView(sprite: Sprite): boolean {
+    if (!this.enableOcclusionCulling) {
+      return true;
+    }
+
     // Get sprite position in world space from transform matrix
     const worldMatrix = sprite.getWorldMatrix();
-    const spritePos = {
-      x: worldMatrix[12],
-      y: worldMatrix[13],
-      z: worldMatrix[14],
-    };
+    const spriteX = worldMatrix[12];
+    const spriteY = worldMatrix[13];
+    const spriteZ = worldMatrix[14];
 
-    // Calculate sprite bounding box in world space
+    // Calculate sprite half-extents
     const halfWidth = sprite.width / 2;
     const halfHeight = sprite.height / 2;
 
-    const spriteLeft = spritePos.x - halfWidth;
-    const spriteRight = spritePos.x + halfWidth;
-    const spriteBottom = spritePos.y - halfHeight;
-    const spriteTop = spritePos.y + halfHeight;
-
-    // For orthographic cameras looking down -Z axis at origin,
-    // the view bounds map to world space coordinates centered at target
-    const viewLeft = this.target.x + this.left;
-    const viewRight = this.target.x + this.right;
-    const viewBottom = this.target.y + this.bottom;
-    const viewTop = this.target.y + this.top;
-
-    // AABB intersection test: check if sprite box overlaps with view box
-    const intersectsX = spriteRight >= viewLeft && spriteLeft <= viewRight;
-    const intersectsY = spriteTop >= viewBottom && spriteBottom <= viewTop;
-
-    // Also check Z depth (near/far planes)
-    // For sprites, we check if their Z position is within the depth range
-    const spriteZ = Math.abs(spritePos.z - this.position.z);
-    const intersectsZ = spriteZ >= this.near && spriteZ <= this.far;
-
-    return intersectsX && intersectsY && intersectsZ;
+    // Use frustum AABB test
+    const frustum = this.getFrustum();
+    return frustum.containsAABBCenterSize(
+      spriteX,
+      spriteY,
+      spriteZ,
+      halfWidth,
+      halfHeight,
+      0
+    );
   }
 }

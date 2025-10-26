@@ -145,10 +145,9 @@ export class BoidGamePlugin implements EcsPlugin {
         const near = 0.1;
         const far = 100;
         // Create camera
-        const camera = new PerspectiveCamera(undefined, aspectRatio, near, far);
+        const camera = new PerspectiveCamera(Math.PI / 4, aspectRatio, near, far);
         camera.position.set(0, 0, 5);
-        camera.target.set(0, 0, 0);
-        camera.markViewDirty();
+        // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 
         commands.spawn(camera, new MainCamera());
         commands.spawn(sceneGraph);

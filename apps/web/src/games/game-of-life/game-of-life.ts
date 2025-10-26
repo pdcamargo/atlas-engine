@@ -162,21 +162,12 @@ export class GameOfLifePlugin implements EcsPlugin {
         commands.spawn(simulation);
 
         // Create camera to fit the grid
-        const aspect = this.gridWidth / this.gridHeight;
         const viewHeight = this.gridHeight * this.cellSize * 0.6;
-        const viewWidth = viewHeight * aspect;
+        const size = viewHeight / 2; // OrthographicCamera takes half-height as size
 
-        const camera = new OrthographicCamera(
-          -viewWidth / 2,
-          viewWidth / 2,
-          -viewHeight / 2,
-          viewHeight / 2,
-          0.1,
-          100
-        );
+        const camera = new OrthographicCamera(size, 0.1, 100);
         camera.position.set(0, 0, 5);
-        camera.target.set(0, 0, 0);
-        camera.markViewDirty();
+        // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 
         commands.spawn(camera, new MainCamera());
         commands.spawn(sceneGraph);

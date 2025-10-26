@@ -1169,14 +1169,21 @@ export class WebgpuRenderer {
   }
 
   /**
-   * Enable or disable frustum culling for all batches
-   * Note: Frustum culling has CPU overhead and may not improve performance
+   * Enable or disable occlusion culling for all batches
+   * Note: Occlusion culling has CPU overhead and may not improve performance
    * for scenes with many small sprites that are mostly visible
    */
-  setFrustumCulling(enabled: boolean): void {
+  setOcclusionCulling(enabled: boolean): void {
     for (const batch of this.batches.values()) {
-      batch.enableFrustumCulling = enabled;
+      batch.enableOcclusionCulling = enabled;
     }
+  }
+
+  /**
+   * @deprecated Use setOcclusionCulling instead
+   */
+  setFrustumCulling(enabled: boolean): void {
+    this.setOcclusionCulling(enabled);
   }
 
   /**
@@ -1236,38 +1243,43 @@ export class WebgpuRenderer {
     camera: Camera,
     paddingMultiplier: number = 1.5
   ): { left: number; right: number; top: number; bottom: number } {
-    // For orthographic cameras, we can directly use the camera bounds
+    // For orthographic cameras, we can directly calculate bounds from size
     if (camera instanceof OrthographicCamera) {
-      const width = camera.right - camera.left;
-      const height = camera.top - camera.bottom;
+      const height = camera.size * 2;
+      const width = height * camera.getAspectRatio();
       const padWidth = (width * (paddingMultiplier - 1)) / 2;
       const padHeight = (height * (paddingMultiplier - 1)) / 2;
 
+      // Calculate where the camera is looking (target point based on forward vector)
+      const forward = camera.getForward();
+      const targetDistance = 5; // Assume camera looks at a point 5 units forward
+      const targetX = camera.position.x + forward.x * targetDistance;
+      const targetY = camera.position.y + forward.y * targetDistance;
+
       return {
-        left: camera.target.x + camera.left - padWidth,
-        right: camera.target.x + camera.right + padWidth,
-        bottom: camera.target.y + camera.bottom - padHeight,
-        top: camera.target.y + camera.top + padHeight,
+        left: targetX - width / 2 - padWidth,
+        right: targetX + width / 2 + padWidth,
+        bottom: targetY - height / 2 - padHeight,
+        top: targetY + height / 2 + padHeight,
       };
     }
 
-    // For perspective cameras, estimate frustum at target distance
+    // For perspective cameras, estimate frustum at a reference distance
     if (camera instanceof PerspectiveCamera) {
-      const distance = Math.sqrt(
-        Math.pow(camera.target.x - camera.position.x, 2) +
-          Math.pow(camera.target.y - camera.position.y, 2) +
-          Math.pow(camera.target.z - camera.position.z, 2)
-      );
+      const forward = camera.getForward();
+      const referenceDistance = 10; // Look 10 units forward
+      const targetX = camera.position.x + forward.x * referenceDistance;
+      const targetY = camera.position.y + forward.y * referenceDistance;
 
       const halfFovTan = Math.tan(camera.fov / 2);
-      const frustumHeight = 2 * halfFovTan * distance * paddingMultiplier;
+      const frustumHeight = 2 * halfFovTan * referenceDistance * paddingMultiplier;
       const frustumWidth = frustumHeight * camera.getAspectRatio();
 
       return {
-        left: camera.target.x - frustumWidth / 2,
-        right: camera.target.x + frustumWidth / 2,
-        bottom: camera.target.y - frustumHeight / 2,
-        top: camera.target.y + frustumHeight / 2,
+        left: targetX - frustumWidth / 2,
+        right: targetX + frustumWidth / 2,
+        bottom: targetY - frustumHeight / 2,
+        top: targetY + frustumHeight / 2,
       };
     }
 

@@ -4,8 +4,10 @@
   "exclude": ["node_modules"],
   "outDir": "./dist",
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ESNext",
     "types": ["@webgpu/types"],
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "module": "ESNext",
+    "moduleResolution": "node12"
   }
 }

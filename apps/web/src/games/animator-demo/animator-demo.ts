@@ -446,10 +446,9 @@ export class AnimatorDemoPlugin implements EcsPlugin {
         // ===================================================================
         // Camera Setup
         // ===================================================================
-        const camera = new OrthographicCamera(-4, 4, -3, 3, 0.1, 100);
+        const camera = new OrthographicCamera(3, 0.1, 100); // size = 3 (half-height)
         camera.position.set(0, 0, 5);
-        camera.target.set(0, 0, 0);
-        camera.markViewDirty();
+        // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 
         commands.spawn(camera, new MainCamera());
         commands.spawn(sceneGraph);

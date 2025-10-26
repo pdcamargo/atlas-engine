@@ -1,6 +1,7 @@
 // Renderer exports
 export { WebgpuRenderer } from "./renderer/Renderer";
-export { PerspectiveCamera, OrthographicCamera } from "./renderer/Camera";
+export { PerspectiveCamera, OrthographicCamera, Camera } from "./renderer/Camera";
+export { Frustum } from "./renderer/Frustum";
 export { SceneNode } from "./renderer/SceneNode";
 export { SceneGraph } from "./renderer/SceneGraph";
 export { Container } from "./renderer/Container";

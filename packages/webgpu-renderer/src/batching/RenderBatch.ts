@@ -1,4 +1,3 @@
-import { Mat4 } from "gl-matrix";
 import { Sprite } from "../renderer/Sprite";
 import { Texture } from "../renderer/Texture";
 import { Camera } from "../renderer/Camera";
@@ -39,8 +38,8 @@ export class RenderBatch {
   private static readonly INITIAL_BUFFER_CAPACITY = 1000; // Start with 1000 sprites
   private static readonly BUFFER_GROWTH_FACTOR = 1.5; // Grow by 50% when full
 
-  // Frustum culling can be expensive for many sprites - make it optional
-  public enableFrustumCulling: boolean = false;
+  // Occlusion culling can be expensive for many sprites - make it optional
+  public enableOcclusionCulling: boolean = false;
 
   constructor(texture: Texture, material: Material) {
     this.texture = texture;
@@ -173,10 +172,10 @@ export class RenderBatch {
       return;
     }
 
-    // Get visible sprites and optionally apply frustum culling
+    // Get visible sprites and optionally apply occlusion culling
     let visibleSprites = this.getVisibleSprites();
 
-    if (this.enableFrustumCulling) {
+    if (this.enableOcclusionCulling) {
       visibleSprites = visibleSprites.filter((sprite) =>
         camera.isInView(sprite)
       );
@@ -403,11 +402,11 @@ export class RenderBatch {
 
   /**
    * Get array of visible sprites for individual rendering
-   * Optionally filter by camera frustum if enabled
+   * Optionally filter by camera occlusion culling if enabled
    */
   getSpritesForIndividualRendering(camera?: Camera): Sprite[] {
     const visible = this.getVisibleSprites();
-    if (camera && this.enableFrustumCulling) {
+    if (camera && this.enableOcclusionCulling) {
       return visible.filter((sprite) => camera.isInView(sprite));
     }
     return visible;
