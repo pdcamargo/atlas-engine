@@ -1,0 +1,14 @@
+{ "columns":5,
+ "image":"protype.png",
+ "imageheight":80,
+ "imagewidth":80,
+ "margin":0,
+ "name":"protype",
+ "spacing":0,
+ "tilecount":25,
+ "tiledversion":"1.11.2",
+ "tileheight":16,
+ "tilewidth":16,
+ "type":"tileset",
+ "version":"1.10"
+}

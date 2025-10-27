@@ -34,10 +34,10 @@ export class TileMapLayer {
   public tint: Color = Color.white();
   public zIndex: number = 0; // For layer ordering
 
-  private tiles: Map<string, TileData> = new Map();
+  private tiles: Map<number, TileData> = new Map();
   private pendingTiles: PendingTileData[] = [];
   private onDirtyCallback?: () => void;
-  private animatedTiles: Map<string, TileData> = new Map(); // Separate tracking for animated tiles
+  private animatedTiles: Map<number, TileData> = new Map(); // Separate tracking for animated tiles
 
   constructor(name: string, onDirtyCallback?: () => void) {
     this.name = name;
@@ -45,17 +45,28 @@ export class TileMapLayer {
   }
 
   /**
-   * Generate a key for tile position
+   * Generate an integer key for tile position using integer hashing
+   * Packs two 16-bit signed integers into one 32-bit unsigned integer
+   * Supports coordinates from -32768 to 32767 per axis
+   * This is much faster than string keys and uses less memory
    */
-  private getKey(x: number, y: number): string {
-    return `${x},${y}`;
+  private getKey(x: number, y: number): number {
+    // Pack two 16-bit signed integers into one 32-bit integer
+    // Same pattern as TileMap chunk keys for consistency
+    return ((x & 0xffff) | ((y & 0xffff) << 16)) >>> 0;
   }
 
   /**
-   * Parse a key back to position
+   * Parse an integer key back to position coordinates
    */
-  private parseKey(key: string): { x: number; y: number } {
-    const [x, y] = key.split(",").map(Number);
+  private parseKey(key: number): { x: number; y: number } {
+    // Extract x (lower 16 bits) with proper sign extension
+    // Use << 16 >> 16 trick to sign-extend from 16-bit to 32-bit
+    const x = (key << 16) >> 16;
+
+    // Extract y (upper 16 bits) with proper sign extension
+    const y = key >> 16;
+
     return { x, y };
   }
 
@@ -170,6 +181,7 @@ export class TileMapLayer {
 
   /**
    * Get all tile positions and data
+   * @deprecated Use getTilesIterator() for better performance with large tile counts
    */
   getAllTiles(): Array<{ x: number; y: number; data: TileData }> {
     const result: Array<{ x: number; y: number; data: TileData }> = [];
@@ -178,6 +190,17 @@ export class TileMapLayer {
       result.push({ x, y, data });
     }
     return result;
+  }
+
+  /**
+   * Iterate over all tiles without allocating an intermediate array
+   * This is much more efficient for large tile counts
+   */
+  *getTilesIterator(): Generator<{ x: number; y: number; data: TileData }> {
+    for (const [key, data] of this.tiles) {
+      const { x, y } = this.parseKey(key);
+      yield { x, y, data };
+    }
   }
 
   /**
@@ -190,6 +213,20 @@ export class TileMapLayer {
       result.push({ x, y, data });
     }
     return result;
+  }
+
+  /**
+   * Iterate over animated tiles without allocating an intermediate array
+   */
+  *getAnimatedTilesIterator(): Generator<{
+    x: number;
+    y: number;
+    data: TileData;
+  }> {
+    for (const [key, data] of this.animatedTiles) {
+      const { x, y } = this.parseKey(key);
+      yield { x, y, data };
+    }
   }
 
   /**
@@ -253,6 +290,8 @@ export class TileMapLayer {
   /**
    * Sync pending tiles whose textures are now ready
    * Returns the number of tiles that were applied
+   *
+   * @deprecated Use syncPendingTilesBatch for better performance with large tile counts
    */
   syncPendingTiles(): number {
     if (this.pendingTiles.length === 0) {
@@ -307,6 +346,102 @@ export class TileMapLayer {
     }
 
     return appliedCount;
+  }
+
+  /**
+   * Sync pending tiles progressively to avoid UI freezes with large tile counts
+   * Processes tiles until maxTiles is reached OR maxTimeMs is exceeded
+   *
+   * @param maxTiles Maximum number of tiles to process in this batch (default: 5000)
+   * @param maxTimeMs Maximum time budget in milliseconds (default: 8ms for 60fps)
+   * @returns Object with applied count, remaining count, and done flag
+   */
+  syncPendingTilesBatch(
+    maxTiles: number = 5000,
+    maxTimeMs: number = 8
+  ): { applied: number; remaining: number; done: boolean } {
+    if (this.pendingTiles.length === 0) {
+      return { applied: 0, remaining: 0, done: true };
+    }
+
+    const startTime = performance.now();
+    let appliedCount = 0;
+    const stillPending: PendingTileData[] = [];
+    let processedCount = 0;
+    const hasTimeLimit = maxTimeMs !== Infinity;
+
+    for (let i = 0; i < this.pendingTiles.length; i++) {
+      const pendingTile = this.pendingTiles[i];
+
+      // Check tile limit
+      if (processedCount >= maxTiles) {
+        // Hit tile limit, keep all remaining tiles pending
+        for (let j = i; j < this.pendingTiles.length; j++) {
+          stillPending.push(this.pendingTiles[j]);
+        }
+        break;
+      }
+
+      // Check time budget (only if not Infinity, check every 1000 tiles to reduce overhead)
+      if (hasTimeLimit && processedCount % 1000 === 0 && appliedCount > 0) {
+        const elapsed = performance.now() - startTime;
+        if (elapsed >= maxTimeMs) {
+          // Hit time budget, keep all remaining tiles pending
+          for (let j = i; j < this.pendingTiles.length; j++) {
+            stillPending.push(this.pendingTiles[j]);
+          }
+          break;
+        }
+      }
+
+      processedCount++;
+
+      if (pendingTile.tileSet.isTextureReady()) {
+        // Resolve tile if it's an ID
+        let tile: Tile | undefined;
+        if (typeof pendingTile.tile === "number" || typeof pendingTile.tile === "string") {
+          tile = pendingTile.tileSet.getTile(pendingTile.tile);
+          if (!tile) {
+            // Tile still doesn't exist, keep pending
+            stillPending.push(pendingTile);
+            continue;
+          }
+        } else {
+          tile = pendingTile.tile;
+        }
+
+        // Texture is ready and tile is resolved, apply the tile
+        const key = this.getKey(pendingTile.x, pendingTile.y);
+        const tileData = {
+          tileSet: pendingTile.tileSet,
+          tile: tile,
+          tint: pendingTile.tint,
+        };
+        this.tiles.set(key, tileData);
+
+        // Track animated tiles separately for efficient updates
+        if (tile instanceof AnimatedTile) {
+          this.animatedTiles.set(key, tileData);
+        }
+
+        appliedCount++;
+      } else {
+        // Still not ready, keep in pending queue
+        stillPending.push(pendingTile);
+      }
+    }
+
+    // Update pending tiles array
+    this.pendingTiles = stillPending;
+
+    // Note: We don't mark dirty here - the TileMap will handle that
+    // after all layers are done syncing to prevent partial rebuilds
+
+    return {
+      applied: appliedCount,
+      remaining: stillPending.length,
+      done: stillPending.length === 0,
+    };
   }
 
   /**

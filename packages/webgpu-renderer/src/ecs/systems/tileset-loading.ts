@@ -96,24 +96,19 @@ export const tileSetLoadingSystem = sys(({ commands }) => {
           `[TileSetLoading] Created ${syncedGrids} pending tile grid(s) for tileset ${tileSet.id}`
         );
       }
-
-      // Sync any pending tiles that were waiting for this texture
-      const syncedCount = tileMap.syncPendingTiles();
-      if (syncedCount > 0) {
-        console.log(
-          `[TileSetLoading] Synced ${syncedCount} pending tiles for tileset ${tileSet.id}`
-        );
-      }
-
-      tileMap.markDirty();
     }
 
-    // Only mark as synced if all tilesets are loaded
-    // This way we keep checking until everything is ready
-    if (allTileSetsLoaded) {
-      commands.addComponent(entity, tileMapTextureSyncedMarker);
+    const syncResult = tileMap.syncPendingTilesBatch(1000000, Infinity);
 
-      console.log("TileMap synced");
+    // If not done syncing tiles, mark as not fully loaded
+    if (!syncResult.done) {
+      allTileSetsLoaded = false;
+    }
+
+    // Only mark as synced if all tilesets are loaded AND all pending tiles are applied
+    const pendingTileCount = tileMap.getTotalPendingTileCount();
+    if (allTileSetsLoaded && pendingTileCount === 0) {
+      commands.addComponent(entity, tileMapTextureSyncedMarker);
     }
   }
 }).label("WebgpuRenderer::TileSetLoading");

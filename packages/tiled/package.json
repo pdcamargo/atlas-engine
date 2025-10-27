@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/engine",
+  "name": "@atlas/tiled",
   "version": "0.0.0",
   "exports": {
     ".": "./src/index.ts"
@@ -12,17 +12,16 @@
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@repo/utils": "workspace:*",
-    "@webgpu/types": "^0.1.64",
+    "@types/pako": "^2.0.4",
     "eslint": "^8.57.0",
     "typescript": "5.5.4"
   },
   "dependencies": {
     "@atlas/core": "workspace:*",
     "@atlas/webgpu-renderer": "workspace:*",
-    "@atlas/audio": "workspace:*",
-    "@atlas/animator": "workspace:*",
-    "@atlas/ui": "workspace:*",
-    "@atlas/tiled": "workspace:*",
+    "base64-js": "^1.5.1",
+    "fzstd": "^0.1.1",
+    "pako": "^2.1.0",
     "reflect-metadata": "^0.2.2"
   }
 }

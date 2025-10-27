@@ -14,7 +14,6 @@ import primitiveShaderCode from "./shaders/primitive.wgsl?raw";
 import { ObjectPool } from "@atlas/core";
 import { RenderBatch } from "../batching";
 import { TileMap } from "./tilemap/TileMap";
-import { TileMapBatch } from "./tilemap/TileMapBatch";
 import { LRUCache } from "../utils/LRUCache";
 import { PostProcessEffect } from "../post-processing/PostProcessEffect";
 import { ParticleEmitter } from "../particles/ParticleEmitter";

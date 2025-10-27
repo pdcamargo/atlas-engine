@@ -28,7 +28,6 @@ import {
   ChromaticAberrationEffect,
   BloomEffect,
   ParticlePresets,
-  SunLight,
   PointLight,
   PixelsPerUnit,
 } from "@atlas/engine";
@@ -113,8 +112,8 @@ export class SlayGamePlugin implements EcsPlugin {
 
         const layer = tilemap.addLayer("default");
 
-        for (let i = 0; i < 100; i++) {
-          for (let j = 0; j < 100; j++) {
+        for (let i = 0; i < 2000; i++) {
+          for (let j = 0; j < 2000; j++) {
             layer.setTileById(i, j, tileSet, 0);
           }
         }

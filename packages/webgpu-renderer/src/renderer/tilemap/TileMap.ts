@@ -46,6 +46,7 @@ export class TileMap extends SceneNode {
   private layerOrder: string[] = []; // Maintain layer rendering order
   private chunks: Map<number, TileMapChunk> = new Map(); // key: integer hash of (chunkX,chunkY)
   private dirty: boolean = true;
+  private isProgressiveLoading: boolean = false; // Track if we're in progressive loading mode
 
   constructor(options: TileMapOptions) {
     super(options.id);
@@ -197,9 +198,10 @@ export class TileMap extends SceneNode {
 
   /**
    * Check if the tilemap is dirty and needs rebuilding
+   * Returns false during progressive loading to prevent partial rebuilds
    */
   isDirty(): boolean {
-    return this.dirty;
+    return this.dirty && !this.isProgressiveLoading;
   }
 
   /**
@@ -324,6 +326,7 @@ export class TileMap extends SceneNode {
 
   /**
    * Build chunks from current layer data
+   * Uses iterator-based access to avoid allocating intermediate arrays
    */
   buildChunks(device: GPUDevice): void {
     // Clear existing chunks
@@ -335,8 +338,8 @@ export class TileMap extends SceneNode {
       const layer = layers[layerIndex];
       if (!layer.visible) continue;
 
-      const allTiles = layer.getAllTiles();
-      for (const { x, y, data } of allTiles) {
+      // Use iterator to avoid allocating array for large tile counts
+      for (const { x, y, data } of layer.getTilesIterator()) {
         // Calculate chunk coordinates
         const { chunkX, chunkY } = this.getChunkCoords(x, y);
         const chunkKey = this.getChunkKey(chunkX, chunkY);
@@ -420,6 +423,8 @@ export class TileMap extends SceneNode {
    * Sync pending tiles across all layers whose textures are now ready
    * This is called automatically by the tileset loading system when textures load
    * Returns the total number of tiles that were applied
+   *
+   * @deprecated Use syncPendingTilesBatch for better performance with large tile counts
    */
   syncPendingTiles(): number {
     let totalApplied = 0;
@@ -430,6 +435,50 @@ export class TileMap extends SceneNode {
     }
 
     return totalApplied;
+  }
+
+  /**
+   * Sync pending tiles progressively across all layers to avoid UI freezes
+   * Processes tiles until maxTiles is reached OR maxTimeMs is exceeded
+   *
+   * @param maxTiles Maximum number of tiles to process per layer in this batch (default: 5000)
+   * @param maxTimeMs Maximum time budget in milliseconds (default: 8ms for 60fps)
+   * @returns Object with total applied count, remaining count across all layers, and done flag
+   */
+  syncPendingTilesBatch(
+    maxTiles: number = 5000,
+    maxTimeMs: number = 8
+  ): { applied: number; remaining: number; done: boolean } {
+    let totalApplied = 0;
+    let totalRemaining = 0;
+    let allDone = true;
+
+    for (const layer of this.layers.values()) {
+      const result = layer.syncPendingTilesBatch(maxTiles, maxTimeMs);
+      totalApplied += result.applied;
+      totalRemaining += result.remaining;
+      if (!result.done) {
+        allDone = false;
+      }
+    }
+
+    // Enable progressive loading mode if we have pending tiles
+    if (totalRemaining > 0) {
+      this.isProgressiveLoading = true;
+    }
+
+    // When all tiles are synced, exit progressive loading mode and mark dirty
+    if (allDone && totalRemaining === 0) {
+      this.isProgressiveLoading = false;
+      // Mark dirty to trigger chunk rebuild with all tiles
+      this.markDirty();
+    }
+
+    return {
+      applied: totalApplied,
+      remaining: totalRemaining,
+      done: allDone,
+    };
   }
 
   /**
