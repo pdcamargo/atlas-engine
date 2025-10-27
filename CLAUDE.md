@@ -124,6 +124,17 @@ interface EcsPlugin {
 - UI component system integrated with ECS
 - UI bundles for common patterns
 
+#### `@atlas/tiled` - Tiled Map Editor Integration
+- Complete ECS integration for Tiled Map Editor (.tmj, .tsj files)
+- Asset loaders for Tiled maps and tilesets
+- Automatic conversion to renderer TileMap/TileSet
+- Support for external and embedded tilesets
+- Deferred texture loading with progressive rendering
+- Object layer conversion to Sprite entities
+- Correct coordinate system conversion (Y-down to Y-up)
+- Pixel-perfect rendering with nearest-neighbor filtering
+- Layer ordering matches Tiled (first layer renders on top)
+
 ### App Initialization Pattern
 
 All apps follow this pattern (see [apps/web/src/main.ts:18-35](apps/web/src/main.ts#L18-L35)):
@@ -601,3 +612,210 @@ The compute system integrates seamlessly with Atlas ECS:
 - **Async systems**: Use `.then()` for non-blocking GPU reads
 - **Visual updates**: Read compute results, update sprite positions/colors
 - **Input handling**: React to keyboard/mouse for interactive simulations
+
+## Tiled Map Editor Integration
+
+The `@atlas/tiled` package provides complete ECS integration with [Tiled Map Editor](https://www.mapeditor.org/), allowing you to load `.tmj` (map) and `.tsj` (tileset) files directly into the engine.
+
+### Architecture Overview
+
+The Tiled integration follows Atlas's ECS architecture pattern:
+
+- **Asset System**: `TiledMapAsset` and `TiledTilesetAsset` for loading map/tileset JSON files
+- **Asset Loaders**: `TiledMapLoader` and `TiledTilesetLoader` registered with AssetServer
+- **Component**: `TiledTileMap` extends `Container` to hold the loaded map hierarchy
+- **System**: `tiledTilemapLoaderSystem` runs every frame to progressively load and sync maps
+- **Plugin**: `TiledEcsPlugin` registers all assets, loaders, and systems
+
+### Key Features
+
+1. **Deferred Loading**: Textures load asynchronously without blocking the game loop
+2. **Progressive Rendering**: Tiles appear as textures become available
+3. **Coordinate Conversion**: Automatically converts Tiled's Y-down coordinates to renderer's Y-up
+4. **Texture Settings**: Applies pixel-perfect nearest-neighbor filtering to prevent bleeding artifacts
+5. **Layer Ordering**: Respects Tiled's layer ordering (first layer in array renders on top)
+6. **Scene Hierarchy**: Creates proper Container hierarchy for tile layers and object layers
+
+### Scene Hierarchy Structure
+
+When a Tiled map is loaded, it creates this hierarchy:
+
+```
+TiledTileMap (Container, user-controlled position)
+├── TileMap (spawned in ECS, contains all tile layers)
+│   ├── TileMapLayer (layer 0 - renders on top)
+│   ├── TileMapLayer (layer 1)
+│   └── TileMapLayer (layer N - renders at bottom)
+└── Container (object layers)
+    ├── Container (object layer 0)
+    │   ├── Sprite (tile object 1)
+    │   └── Sprite (tile object 2)
+    └── Container (object layer 1)
+```
+
+### Basic Usage
+
+```typescript
+import { TiledEcsPlugin, TiledTileMap } from "@atlas/tiled";
+import { AssetServer, SceneGraph } from "@atlas/engine";
+
+// 1. Add plugin to app
+await App.create()
+  .addPlugins(new TiledEcsPlugin())
+  .run();
+
+// 2. In a system, load and spawn the map
+sys(({ commands }) => {
+  const assetServer = commands.getResource(AssetServer);
+  const sceneGraph = commands.getResource(SceneGraph);
+
+  // Load the map asset
+  const mapHandle = assetServer.load<TiledMapAsset>("/maps/my-map.tmj");
+
+  // Create TiledTileMap component
+  const tiledMap = new TiledTileMap(mapHandle);
+  tiledMap.setPosition({ x: 0, y: 0, z: 0 });
+
+  // Add to scene graph for rendering
+  sceneGraph.addRoot(tiledMap);
+
+  // Spawn into ECS world
+  commands.spawn(tiledMap);
+});
+```
+
+### How It Works Internally
+
+**Initial Load (First Frame):**
+1. System checks if `TiledTileMap.loaded === false`
+2. Waits for map asset JSON to load via AssetServer
+3. Loads external tilesets (`.tsj` files) if referenced
+4. Starts loading tileset images (doesn't wait for them)
+5. Creates `TileSet` objects with image `Handle<ImageAsset>`
+6. Creates `TileMap` and adds tile layers
+7. Places tiles using `mapLayer.setTileById()` (deferred if texture not ready)
+8. Spawns `TileMap` into ECS world with `TextureFilter` component
+9. Marks `TiledTileMap.loaded = true`
+
+**Subsequent Frames (After Load):**
+1. System syncs pending tile grids: `tileSet.syncPendingTileGrids()`
+2. System syncs pending tiles: `layer.syncPendingTiles()`
+3. `tileSetLoadingSystem` (from webgpu-renderer) converts `Handle<ImageAsset>` → `Texture`
+4. Tiles progressively appear as textures become ready
+
+### Important Implementation Details
+
+**Coordinate System Conversion:**
+- Tiled uses Y-down (origin top-left, row 0 is top)
+- Renderer uses Y-up (origin bottom-left, row 0 is bottom)
+- Solution: `const rendererY = height - 1 - y` when placing tiles
+
+**Texture Filtering:**
+- Default renderer uses `flipY: true, minFilter: "linear", magFilter: "linear"`
+- Tiled tilesets need `flipY: false` (Y-down coordinate system)
+- Linear filtering causes bleeding artifacts between tiles
+- Solution: Apply `TextureFilter` with nearest-neighbor filtering:
+  ```typescript
+  textureFilter.flipY = false;
+  textureFilter.minFilter = "nearest";
+  textureFilter.magFilter = "nearest";
+  textureFilter.mips = false;
+  ```
+
+**Layer Ordering:**
+- Tiled renders layers in array order: `layers[0]` on bottom, `layers[n-1]` on top
+- Actually, Tiled's UI shows `layers[0]` at top of list and renders it on top
+- Solution: Reverse z-index calculation:
+  ```typescript
+  const layerZIndex = parentZIndex + (layers.length - 1 - i) * 0.01;
+  ```
+
+**GID to Local ID Conversion:**
+- Tiled uses Global IDs (GIDs) with flip flags in top 3 bits
+- Must decode: `localId = (gid & FLIP_FLAGS_MASK) - firstgid`
+- Special case: GID 0 is always empty tile
+
+**Deferred Loading Pattern:**
+- Don't wait for `assetServer.getLoadState(imageHandle) === LoadState.Loaded`
+- Let `TileSet.addTilesFromGrid()` defer if texture not ready
+- Let `syncPendingTileGrids()` and `syncPendingTiles()` handle progressive loading
+- `tileSetLoadingSystem` converts handles to textures when loaded
+
+### File Structure
+
+```
+packages/tiled/src/
+├── ecs/
+│   ├── assets/
+│   │   ├── tiled-map-asset.ts       # Asset type for .tmj files
+│   │   ├── tiled-map-loader.ts      # AssetLoader for .tmj
+│   │   ├── tiled-tileset-asset.ts   # Asset type for .tsj files
+│   │   └── tiled-tileset-loader.ts  # AssetLoader for .tsj
+│   ├── components/
+│   │   └── tiled-tilemap.ts         # TiledTileMap component
+│   ├── systems/
+│   │   └── tiled-tilemap-loader.ts  # Main loading system
+│   ├── utils/
+│   │   ├── gid-utils.ts             # GID decoding and tileset lookup
+│   │   └── coordinate-converter.ts  # Tiled→Atlas coordinate conversion
+│   └── plugin.ts                    # TiledEcsPlugin
+├── utils/                           # Tiled format type definitions
+│   ├── layer/                       # Layer types and decoders
+│   ├── tileset/                     # Tileset types
+│   └── tile/                        # Tile and frame types
+└── index.ts                         # Public exports
+```
+
+### Common Issues and Solutions
+
+**Issue: Tiles not rendering**
+- Check that `TileMap` is spawned into ECS world (`commands.spawn(tileMap)`)
+- The `tileSetLoadingSystem` queries for `TileMap` components to load textures
+- Solution: System now automatically spawns `TileMap` in Step 7 of loading
+
+**Issue: Line artifacts between tiles**
+- Caused by linear texture filtering sampling between adjacent tiles
+- Solution: Use nearest-neighbor filtering (automatically applied)
+
+**Issue: Map renders upside down**
+- Tiled uses Y-down, renderer uses Y-up
+- Solution: Y-coordinate conversion during tile placement (automatically handled)
+
+**Issue: Wrong tiles appear**
+- Texture might be flipped vertically due to `flipY: true`
+- Solution: Set `flipY: false` for Tiled tilesets (automatically applied)
+
+**Issue: Layers in wrong order**
+- Z-index calculation might not match Tiled's rendering order
+- Solution: Reverse z-index calculation (automatically handled)
+
+### Supported Features
+
+✓ Tile layers with GID-based tiles
+✓ External tilesets (`.tsj` files)
+✓ Embedded tilesets
+✓ Object layers (tile objects converted to Sprites)
+✓ Layer visibility
+✓ Layer groups (recursive processing)
+✓ Layer tint colors
+✓ Deferred texture loading
+✓ Coordinate system conversion
+✓ Animated tiles (via TileSet.addAnimatedTile)
+
+### Not Yet Supported
+
+✗ Flip flags (horizontal/vertical/diagonal)
+✗ Layer opacity (renderer doesn't support it yet)
+✗ Image layers
+✗ Non-tile objects (rectangles, ellipses, polygons, text)
+✗ Tile collision data
+✗ Custom properties
+✗ Infinite maps
+✗ Isometric/hexagonal maps
+
+### Performance Considerations
+
+- Maps load progressively without blocking the game loop
+- Texture loading is deferred and handled by the renderer's asset system
+- Large maps with many tiles render efficiently via TileMap chunking
+- Object layers create individual Sprite entities (may impact performance with many objects)

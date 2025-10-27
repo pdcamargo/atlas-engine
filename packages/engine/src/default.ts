@@ -13,6 +13,7 @@ import {
 import { WebgpuRenderer, WebgpuRendererPlugin } from "@atlas/webgpu-renderer";
 import { AudioPlugin } from "@atlas/audio";
 import { Position, Text, TextBundle, UiPlugin, UiRoot } from "@atlas/ui";
+import { TiledEcsPlugin } from "@atlas/tiled";
 
 export type DefaultPluginOptions = {
   container?: HTMLElement | null;
@@ -38,6 +39,7 @@ export class DefaultPlugin implements EcsPluginGroup {
       }),
       new AudioPlugin(),
       new UiPlugin(),
+      new TiledEcsPlugin(),
     ];
   }
 }

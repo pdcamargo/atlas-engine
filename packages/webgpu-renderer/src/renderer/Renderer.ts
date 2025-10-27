@@ -117,7 +117,12 @@ export class WebgpuRenderer {
 
   constructor(options: RendererOptions = {}) {
     this.canvas = options.canvas || this.createCanvas();
-    this.clearColor = options.clearColor || { r: 0.1, g: 0.1, b: 0.1, a: 1.0 };
+    this.clearColor = options.clearColor || {
+      r: 51 / 255,
+      g: 255 / 255,
+      b: 255 / 255,
+      a: 1.0,
+    };
     // Quad buffers will be initialized in init()
     this.quadBuffers = {
       buffers: [],

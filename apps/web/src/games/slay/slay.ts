@@ -112,15 +112,15 @@ export class SlayGamePlugin implements EcsPlugin {
 
         const layer = tilemap.addLayer("default");
 
-        for (let i = 0; i < 2000; i++) {
-          for (let j = 0; j < 2000; j++) {
+        for (let i = 0; i < 100; i++) {
+          for (let j = 0; j < 100; j++) {
             layer.setTileById(i, j, tileSet, 0);
           }
         }
 
-        for (let i = 0; i < 101; i++) {
-          for (let j = 0; j < 110; j++) {
-            // layer.setTileById(i, j, tileSet, 333);
+        for (let i = 101; i < 110; i++) {
+          for (let j = 101; j < 110; j++) {
+            layer.setTileById(i, j, tileSet, 333);
           }
         }
 

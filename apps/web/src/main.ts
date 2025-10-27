@@ -7,13 +7,14 @@ import "./style.css";
 import { App, DebugPlugin, EcsPlugin } from "@atlas/engine";
 import { SlayGamePlugin } from "./games/slay";
 import { SerializationDemoPlugin } from "./games/serialization-demo/serialization-demo";
+import { TiledGamePlugin } from "./games/tiled";
 
 // Select which game to run:
 // - "boid" - Flocking simulation (500 boids)
 // - "game-of-life" - Conway's Game of Life (128x128 grid)
 // - "animator-demo" - Comprehensive animator system demonstration
 // - "ui-demo" - UI system demo with game menu
-const GAME = "slay";
+const GAME = "tiled";
 
 async function main() {
   const gamePlugins: Record<string, () => EcsPlugin> = {
@@ -23,6 +24,7 @@ async function main() {
     "ui-demo": () => new UiDemoPlugin(),
     slay: () => new SlayGamePlugin(),
     "serialization-demo": () => new SerializationDemoPlugin(),
+    tiled: () => new TiledGamePlugin(),
   };
 
   const gamePlugin = (gamePlugins[GAME] ?? gamePlugins["ui-demo"])();

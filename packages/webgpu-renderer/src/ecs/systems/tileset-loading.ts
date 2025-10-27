@@ -29,6 +29,8 @@ export const tileSetLoadingSystem = sys(({ commands }) => {
   for (const [entity, tileMap] of commands.query(unsynced).all()) {
     let allTileSetsLoaded = true;
 
+    console.log(tileMap, " tilemap");
+
     // Get all unique tilesets (from placed tiles, pending tiles, and pending grids)
     const allTileSets = tileMap.getAllTileSets();
 

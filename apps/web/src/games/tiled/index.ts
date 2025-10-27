@@ -1,0 +1,1 @@
+export { TiledGamePlugin } from "./tiled";
