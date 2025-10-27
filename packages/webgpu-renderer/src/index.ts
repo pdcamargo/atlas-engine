@@ -83,6 +83,7 @@ export { WebgpuRendererPlugin } from "./ecs/plugin";
 export { GpuRenderDevice } from "./ecs/resources/render-device";
 export { GpuPresentationFormat } from "./ecs/resources/presentation-format";
 export { GpuCanvasContext } from "./ecs/resources/canvas-context";
+export { PixelsPerUnit } from "./ecs/resources/pixels-per-unit";
 
 export * from "./ecs/components";
 

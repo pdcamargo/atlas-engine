@@ -30,9 +30,10 @@ export class RenderBatch {
   // Threshold for when to use instancing vs individual draws
   private static readonly INSTANCING_THRESHOLD = 1;
 
-  // Bytes per sprite instance: 2 floats (position) + 2 floats (size) + 4 floats (frame) + 4 floats (tint) = 12 floats = 48 bytes
-  private static readonly BYTES_PER_INSTANCE = 48;
-  private static readonly FLOATS_PER_INSTANCE = 12;
+  // Bytes per sprite instance with proper GPU alignment:
+  // vec3f position (12) + padding (4) + vec2f size (8) + padding (8) + vec4f frame (16) + vec4f tint (16) = 64 bytes
+  private static readonly BYTES_PER_INSTANCE = 64;
+  private static readonly FLOATS_PER_INSTANCE = 16;
 
   // Persistent buffer settings
   private static readonly INITIAL_BUFFER_CAPACITY = 1000; // Start with 1000 sprites
@@ -301,25 +302,38 @@ export class RenderBatch {
   /**
    * Pack a single sprite's data into instance buffer at given offset
    * Extracted to avoid code duplication
+   * Layout: vec3f position + padding + vec2f size + padding + vec4f frame + vec4f tint
    */
   private packSpriteInstanceData(sprite: Sprite, offset: number): void {
     // Get cached world position (no matrix extraction, just array access)
     const worldPos = sprite.getWorldPosition();
     const worldX = worldPos.x;
     const worldY = worldPos.y;
+    const worldZ = worldPos.z;
 
     // Get cached world scale (no sqrt operations!)
     const worldScale = sprite.getWorldScale();
     const worldSizeX = sprite.width * worldScale.x;
     const worldSizeY = sprite.height * worldScale.y;
 
-    // Pack data: position (2) + size (2) + frame (4) + tint (4) = 12 floats
+    // Pack data with proper GPU alignment (16 floats = 64 bytes):
+    // position (vec3f) - 3 floats
     this.instanceData[offset + 0] = worldX;
     this.instanceData[offset + 1] = worldY;
-    this.instanceData[offset + 2] = worldSizeX;
-    this.instanceData[offset + 3] = worldSizeY;
-    this.instanceData.set(sprite.frame.data, offset + 4);
-    this.instanceData.set(sprite.tint.data, offset + 8);
+    this.instanceData[offset + 2] = worldZ;
+    this.instanceData[offset + 3] = 0.0; // padding
+
+    // size (vec2f) - 2 floats
+    this.instanceData[offset + 4] = worldSizeX;
+    this.instanceData[offset + 5] = worldSizeY;
+    this.instanceData[offset + 6] = 0.0; // padding
+    this.instanceData[offset + 7] = 0.0; // padding
+
+    // frame (vec4f) - 4 floats
+    this.instanceData.set(sprite.frame.data, offset + 8);
+
+    // tint (vec4f) - 4 floats
+    this.instanceData.set(sprite.tint.data, offset + 12);
   }
 
   /**

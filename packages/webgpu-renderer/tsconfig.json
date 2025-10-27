@@ -2,12 +2,8 @@
   "extends": "@repo/typescript-config/base.json",
   "include": ["."],
   "exclude": ["node_modules"],
-  "outDir": "./dist",
   "compilerOptions": {
-    "target": "ESNext",
-    "types": ["@webgpu/types"],
-    "outDir": "./dist",
-    "module": "ESNext",
-    "moduleResolution": "node12"
+    "target": "ES2022",
+    "types": ["@webgpu/types"]
   }
 }

@@ -15,7 +15,9 @@ export class VignetteEffect extends PostProcessEffect {
   public intensity: number; // 0 = none, 1 = black corners
   public smoothness: number; // Higher = smoother falloff
 
-  constructor(config: { intensity?: number; smoothness?: number; order?: number } = {}) {
+  constructor(
+    config: { intensity?: number; smoothness?: number; order?: number } = {}
+  ) {
     super(config.order ?? 0);
 
     this.intensity = config.intensity ?? 0.5;
@@ -78,7 +80,12 @@ export class VignetteEffect extends PostProcessEffect {
     width: number,
     height: number
   ): void {
-    if (!this.pipeline || !this.uniformBuffer || !this.fullscreenQuad || !this.sampler) {
+    if (
+      !this.pipeline ||
+      !this.uniformBuffer ||
+      !this.fullscreenQuad ||
+      !this.sampler
+    ) {
       throw new Error("VignetteEffect not initialized");
     }
 

@@ -10,7 +10,7 @@ import {
   TimePlugin,
   ViewportPlugin,
 } from "@atlas/core";
-import { WebgpuRendererPlugin } from "@atlas/webgpu-renderer";
+import { WebgpuRenderer, WebgpuRendererPlugin } from "@atlas/webgpu-renderer";
 import { AudioPlugin } from "@atlas/audio";
 import { Position, Text, TextBundle, UiPlugin, UiRoot } from "@atlas/ui";
 
@@ -53,7 +53,7 @@ export class DebugPlugin implements EcsPlugin {
         commands
           .spawnBundle(TextBundle, {
             text: ["Hello, World!"],
-            textStyle: [{ fontSize: 24, fontWeight: "bold" }],
+            textStyle: [{ fontSize: 13, fontWeight: "bold" }],
             textColor: [{ color: "white" }],
             textAlign: [{ textAlign: "center" }],
           })
@@ -69,11 +69,22 @@ export class DebugPlugin implements EcsPlugin {
       })
       .addUpdateSystems(({ commands }) => {
         const time = commands.getResource(Time);
+        const renderer = commands.getResource(WebgpuRenderer);
+        const stats = renderer.getStats();
 
         const [, fpsText] = commands.query(Text, FpsMarker).find();
 
         if (fpsText) {
-          fpsText.content = `FPS: ${time.fps.toFixed(2)}`;
+          fpsText.content = `
+            FPS: ${time.fps.toFixed(2)}
+            Draw Calls: ${stats.drawCalls}
+            Rendered Sprites: ${stats.renderedSprites}
+            Batches: ${stats.batches}
+            Total Batches: ${stats.totalBatches}
+            Total Tiles: ${stats.totalTiles}
+            Rendered Tiles: ${stats.renderedTiles}
+            Skipped Tiles: ${stats.skippedTiles}
+          `;
         }
       });
   }

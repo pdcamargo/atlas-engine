@@ -3,7 +3,7 @@
   "include": ["."],
   "exclude": ["node_modules"],
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ESNext",
     "types": []
   }
 }

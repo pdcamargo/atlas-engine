@@ -18,7 +18,11 @@ import { TileMapBatch } from "./tilemap/TileMapBatch";
 import { LRUCache } from "../utils/LRUCache";
 import { PostProcessEffect } from "../post-processing/PostProcessEffect";
 import { ParticleEmitter } from "../particles/ParticleEmitter";
-import { LightingSystem, MAX_POINT_LIGHTS, MAX_SPOT_LIGHTS } from "../ecs/resources/lighting-system";
+import {
+  LightingSystem,
+  MAX_POINT_LIGHTS,
+  MAX_SPOT_LIGHTS,
+} from "../ecs/resources/lighting-system";
 import { DEFAULT_SPRITE_MATERIAL } from "../materials/SpriteMaterial";
 
 interface RendererOptions {
@@ -239,7 +243,8 @@ export class WebgpuRenderer {
     this.spriteBindGroupLayout = this.spritePipeline.getBindGroupLayout(0);
     this.spriteInstancedBindGroupLayout =
       this.spriteInstancedPipeline.getBindGroupLayout(0);
-    this.spriteLitBindGroupLayout = this.spriteLitPipeline.getBindGroupLayout(0);
+    this.spriteLitBindGroupLayout =
+      this.spriteLitPipeline.getBindGroupLayout(0);
     this.spriteLitInstancedBindGroupLayout =
       this.spriteLitInstancedPipeline.getBindGroupLayout(0);
     this.primitiveBindGroupLayout =
@@ -502,18 +507,35 @@ export class WebgpuRenderer {
       defaultUniforms.set([1, 1, 1, 0], 8); // sun color
       defaultUniforms.set([0, 0, 0, 0], 12); // numPointLights, numSpotLights, padding
     }
-    this.device.queue.writeBuffer(this.lightingUniformBuffer, 0, defaultUniforms);
+    this.device.queue.writeBuffer(
+      this.lightingUniformBuffer,
+      0,
+      defaultUniforms
+    );
 
     // Initialize storage buffers with empty data
-    const emptyPointLights = new Float32Array(LightingSystem.getPointLightSize() / 4);
-    this.device.queue.writeBuffer(this.pointLightsStorageBuffer, 0, emptyPointLights);
+    const emptyPointLights = new Float32Array(
+      LightingSystem.getPointLightSize() / 4
+    );
+    this.device.queue.writeBuffer(
+      this.pointLightsStorageBuffer,
+      0,
+      emptyPointLights
+    );
 
-    const emptySpotLights = new Float32Array(LightingSystem.getSpotLightSize() / 4);
-    this.device.queue.writeBuffer(this.spotLightsStorageBuffer, 0, emptySpotLights);
+    const emptySpotLights = new Float32Array(
+      LightingSystem.getSpotLightSize() / 4
+    );
+    this.device.queue.writeBuffer(
+      this.spotLightsStorageBuffer,
+      0,
+      emptySpotLights
+    );
 
     // Get bind group layouts from both lit pipelines (group 1)
     this.lightingBindGroupLayout = this.spriteLitPipeline.getBindGroupLayout(1);
-    this.lightingBindGroupLayoutInstanced = this.spriteLitInstancedPipeline.getBindGroupLayout(1);
+    this.lightingBindGroupLayoutInstanced =
+      this.spriteLitInstancedPipeline.getBindGroupLayout(1);
 
     // Create lighting bind group for lit sprite pipeline
     this.lightingBindGroup = this.device.createBindGroup({
@@ -714,7 +736,10 @@ export class WebgpuRenderer {
 
     // Ensure render targets exist if we have post-processing
     // We need both scene texture AND ping-pong textures
-    if (hasPostProcessing && (!this.sceneTexture || this.postProcessTextures.length === 0)) {
+    if (
+      hasPostProcessing &&
+      (!this.sceneTexture || this.postProcessTextures.length === 0)
+    ) {
       this.updateRenderTargets();
     }
 
@@ -795,7 +820,9 @@ export class WebgpuRenderer {
 
     // If lit but lighting not ready, skip this batch
     if (isLit && !this.lightingBindGroupInstanced) {
-      console.warn("Lit instanced sprites require lighting system to be initialized");
+      console.warn(
+        "Lit instanced sprites require lighting system to be initialized"
+      );
       return;
     }
 
@@ -1272,7 +1299,8 @@ export class WebgpuRenderer {
       const targetY = camera.position.y + forward.y * referenceDistance;
 
       const halfFovTan = Math.tan(camera.fov / 2);
-      const frustumHeight = 2 * halfFovTan * referenceDistance * paddingMultiplier;
+      const frustumHeight =
+        2 * halfFovTan * referenceDistance * paddingMultiplier;
       const frustumWidth = frustumHeight * camera.getAspectRatio();
 
       return {
@@ -1485,7 +1513,8 @@ export class WebgpuRenderer {
     this.sceneTexture = this.device.createTexture({
       size: { width, height },
       format: this.format,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      usage:
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       label: "Scene Render Target",
     });
 
@@ -1498,7 +1527,9 @@ export class WebgpuRenderer {
           this.device.createTexture({
             size: { width, height },
             format: this.format,
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+            usage:
+              GPUTextureUsage.RENDER_ATTACHMENT |
+              GPUTextureUsage.TEXTURE_BINDING,
             label: `Post-Process Texture ${i}`,
           })
         );
@@ -1523,7 +1554,9 @@ export class WebgpuRenderer {
       throw new Error("Scene texture not created for post-processing");
     }
     if (effects.length > 1 && this.postProcessTextures.length < 2) {
-      throw new Error(`Post-processing requires 2 ping-pong textures, but only ${this.postProcessTextures.length} exist`);
+      throw new Error(
+        `Post-processing requires 2 ping-pong textures, but only ${this.postProcessTextures.length} exist`
+      );
     }
 
     // Start with scene texture as source

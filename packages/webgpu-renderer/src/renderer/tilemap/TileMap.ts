@@ -6,10 +6,11 @@ import { Color } from "@atlas/core";
 import { TileMapChunk, ChunkBounds } from "./TileMapChunk";
 import { Material } from "../../materials/Material";
 import { DEFAULT_SPRITE_MATERIAL } from "../../materials/SpriteMaterial";
+import { PixelsPerUnit } from "../../ecs/resources/pixels-per-unit";
 
 export interface TileMapOptions {
-  tileWidth: number;
-  tileHeight: number;
+  tileWidth: number; // Tile width in pixels (will be converted to world units)
+  tileHeight: number; // Tile height in pixels (will be converted to world units)
   chunkSize?: number;
   id?: string;
 }
@@ -17,6 +18,23 @@ export interface TileMapOptions {
 /**
  * TileMap is a scene node that manages multiple layers of tiles
  * It uses a dirty flag system to optimize rendering and batch updates
+ *
+ * Coordinate System:
+ * - tileWidth/tileHeight are specified in PIXELS and automatically converted to world units
+ * - Uses the global PixelsPerUnit setting (default: 100 pixels = 1 world unit)
+ * - Must match Sprite dimensions for consistent scaling
+ *
+ * Usage:
+ * ```typescript
+ * // Set global PPU first (before creating any sprites or tilemaps)
+ * PixelsPerUnit.setGlobal(16); // 16 pixels = 1 world unit
+ *
+ * // Create tilemap with 16x16 pixel tiles (becomes 1x1 world units)
+ * const tilemap = new TileMap({ tileWidth: 16, tileHeight: 16 });
+ *
+ * // Create sprite with same size - they will match!
+ * const sprite = new Sprite(texture, 16, 16); // Also 1x1 world units
+ * ```
  */
 export class TileMap extends SceneNode {
   public readonly tileWidth: number;
@@ -31,8 +49,10 @@ export class TileMap extends SceneNode {
 
   constructor(options: TileMapOptions) {
     super(options.id);
-    this.tileWidth = options.tileWidth;
-    this.tileHeight = options.tileHeight;
+
+    // Convert pixel dimensions to world units using global PixelsPerUnit
+    this.tileWidth = PixelsPerUnit.toWorldUnits(options.tileWidth);
+    this.tileHeight = PixelsPerUnit.toWorldUnits(options.tileHeight);
     this.chunkSize = options.chunkSize ?? 10; // Default 10x10 tiles per chunk
   }
 

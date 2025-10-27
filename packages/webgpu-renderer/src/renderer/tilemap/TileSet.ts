@@ -22,11 +22,25 @@ interface PendingAnimatedTile {
  * TileSet manages a texture and its tile definitions
  * Multiple tiles can reference different regions of the same texture
  * Supports both pre-loaded Textures and lazy-loaded Handles
+ *
+ * IMPORTANT: TileSet dimensions are specified in PIXELS and are used for:
+ * - Calculating tile positions in the texture atlas (grid layout)
+ * - Generating UV coordinates for each tile
+ *
+ * These pixel dimensions MUST match the TileMap's pixel dimensions:
+ * ```typescript
+ * // Both must use the same pixel dimensions (16x16)
+ * const tileSet = new TileSet(texture, 16, 16);
+ * const tileMap = new TileMap({ tileWidth: 16, tileHeight: 16 });
+ * ```
+ *
+ * The TileMap will convert these to world units using PixelsPerUnit, but
+ * TileSet keeps them in pixels for texture coordinate calculations.
  */
 export class TileSet {
   public texture: Texture | Handle<ImageAsset>;
-  public readonly tileWidth: number;
-  public readonly tileHeight: number;
+  public readonly tileWidth: number;  // Tile width in PIXELS
+  public readonly tileHeight: number; // Tile height in PIXELS
   public readonly id: string;
 
   private tiles: Map<number | string, Tile> = new Map();
@@ -36,8 +50,8 @@ export class TileSet {
 
   constructor(
     texture: Texture | Handle<ImageAsset>,
-    tileWidth: number,
-    tileHeight: number,
+    tileWidth: number,   // Width of each tile in PIXELS (must match TileMap's tileWidth)
+    tileHeight: number,  // Height of each tile in PIXELS (must match TileMap's tileHeight)
     options: TileSetOptions = {}
   ) {
     this.texture = texture;

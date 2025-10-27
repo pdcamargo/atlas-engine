@@ -7,7 +7,6 @@ import {
   SceneGraph,
   Sprite,
   Color,
-  OrthographicCamera,
   PerspectiveCamera,
   Rect,
   WebgpuRenderer,
@@ -31,7 +30,7 @@ import {
   ParticlePresets,
   SunLight,
   PointLight,
-  SpotLight,
+  PixelsPerUnit,
 } from "@atlas/engine";
 
 import { TauriFileSystemAdapter } from "../../plugins/file-system";
@@ -46,6 +45,10 @@ export class SlayGamePlugin implements EcsPlugin {
         })
       )
       .addStartupSystems(({ commands }) => {
+        // Set global pixels-per-unit: 16 pixels = 1 world unit
+        // This ensures sprites and tiles with same pixel size render at same size
+        PixelsPerUnit.setGlobal(100);
+
         // Get the asset server
         const assetServer = commands.getResource(AssetServer);
 
@@ -78,12 +81,14 @@ export class SlayGamePlugin implements EcsPlugin {
           mips: false,
         });
 
-        // Create TileMap with handle directly - no need to wait!
+        // Create TileMap with 16x16 pixel tiles
+        // With PPU=16, these become 1x1 world unit tiles
         const tilemap = new TileMap({
           tileWidth: 16,
           tileHeight: 16,
         });
 
+        // TileSet must use the same pixel dimensions (16x16) to match the TileMap
         const tileSet = new TileSet(tilemapHandle, 16, 16);
 
         tileSet.addTilesFromGrid(13, 21);
@@ -102,7 +107,6 @@ export class SlayGamePlugin implements EcsPlugin {
           1.0 // normal speed
         );
 
-        tilemap.setScale({ x: 0.005, y: 0.005 });
         tilemap.setPosition({ x: -1, y: -1 });
 
         const layer = tilemap.addLayer("default");
@@ -127,7 +131,7 @@ export class SlayGamePlugin implements EcsPlugin {
         commands.spawn(tilemap, nearestFilter);
 
         for (let i = 0; i < 0; i++) {
-          const sprite = new Sprite(textureHandle, 0.5, 0.5);
+          const sprite = new Sprite(textureHandle);
           sprite.setTint(
             new Color(Math.random(), Math.random(), Math.random())
           );
@@ -203,7 +207,8 @@ export class SlayGamePlugin implements EcsPlugin {
         });
 
         for (let i = 0; i < 256; i++) {
-          const animatedSprite = new AnimatedSprite(null, 0.5, 0.5);
+          // Character sprites are 64x64 pixels (8 frames × 64px in 512px texture)
+          const animatedSprite = new AnimatedSprite(null, 64, 64);
 
           animatedSprite.addAnimation("runDown", runDownAnimation);
           animatedSprite.addAnimation("runUp", runUpAnimation);
@@ -245,7 +250,7 @@ export class SlayGamePlugin implements EcsPlugin {
           const pos = {
             x: Math.random() * 5 - 2.5,
             y: Math.random() * 5 - 2.5,
-            z: 0,
+            z: 1,
           };
 
           animatedSprite.setPosition(pos);
@@ -270,7 +275,7 @@ export class SlayGamePlugin implements EcsPlugin {
         // Create camera
         // const camera = new OrthographicCamera(1, 0.1, 100); // size = 1 (half-height)
         const camera = new PerspectiveCamera(Math.PI / 4, 1, 0.1, 100); // size = 1 (half-height)
-        camera.position.set(0, 0, 5);
+        camera.position.set(0, 0, 3);
         // camera.rotation.set(0, Math.PI / 4, 0);
         // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 

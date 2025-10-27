@@ -27,14 +27,10 @@ export class TileMapBatch {
   private instanceCount: number = 0;
   private bufferId: number; // Unique ID for bind group caching (globally unique)
 
-  // Bytes per tile instance (GPU-optimized layout):
-  // - position (2 floats = 8 bytes)
-  // - size (2 floats = 8 bytes)
-  // - frame (4 floats = 16 bytes)
-  // - tint (4 floats = 16 bytes)
-  // Total: 12 floats = 48 bytes (was 96 bytes - 50% reduction!)
-  private static readonly BYTES_PER_INSTANCE = 48;
-  private static readonly FLOATS_PER_INSTANCE = 12;
+  // Bytes per tile instance with proper GPU alignment (matches sprite layout):
+  // vec3f position (12) + padding (4) + vec2f size (8) + padding (8) + vec4f frame (16) + vec4f tint (16) = 64 bytes
+  private static readonly BYTES_PER_INSTANCE = 64;
+  private static readonly FLOATS_PER_INSTANCE = 16;
 
   constructor(tileSet: TileSet) {
     this.tileSet = tileSet;
@@ -110,6 +106,7 @@ export class TileMapBatch {
     // Extract world transform from matrix
     const worldX = worldMatrix[12];
     const worldY = worldMatrix[13];
+    const worldZ = worldMatrix[14]; // Extract z-coordinate
     const scaleX = Math.sqrt(
       worldMatrix[0] * worldMatrix[0] + worldMatrix[1] * worldMatrix[1]
     );
@@ -124,20 +121,34 @@ export class TileMapBatch {
       // Calculate world position (tilemap transform applied)
       const worldPosX = worldX + tileInstance.x * tileWidth * scaleX;
       const worldPosY = worldY + tileInstance.y * tileHeight * scaleY;
+      const worldPosZ = worldZ; // Tiles share the same z as the tilemap
 
       // Calculate world size (tilemap scale applied)
       const worldSizeX = tileWidth * scaleX;
       const worldSizeY = tileHeight * scaleY;
 
-      // Pack data: position (2) + size (2) + frame (4) + tint (4) = 12 floats
+      // DEBUG: Force to 1.0 to test
+      // const worldSizeX = 1.0;
+      // const worldSizeY = 1.0;
+
+      // Pack data with proper GPU alignment (16 floats = 64 bytes):
+      // position (vec3f) - 3 floats
       this.instanceData[offset + 0] = worldPosX;
       this.instanceData[offset + 1] = worldPosY;
-      this.instanceData[offset + 2] = worldSizeX;
-      this.instanceData[offset + 3] = worldSizeY;
+      this.instanceData[offset + 2] = worldPosZ;
+      this.instanceData[offset + 3] = 0.0; // padding
 
-      // Frame and tint
-      this.instanceData.set(tileInstance.tile.frame.data, offset + 4);
-      this.instanceData.set(tileInstance.tint.data, offset + 8);
+      // size (vec2f) - 2 floats
+      this.instanceData[offset + 4] = worldSizeX;
+      this.instanceData[offset + 5] = worldSizeY;
+      this.instanceData[offset + 6] = 0.0; // padding
+      this.instanceData[offset + 7] = 0.0; // padding
+
+      // frame (vec4f) - 4 floats
+      this.instanceData.set(tileInstance.tile.frame.data, offset + 8);
+
+      // tint (vec4f) - 4 floats
+      this.instanceData.set(tileInstance.tint.data, offset + 12);
 
       offset += TileMapBatch.FLOATS_PER_INSTANCE;
     }

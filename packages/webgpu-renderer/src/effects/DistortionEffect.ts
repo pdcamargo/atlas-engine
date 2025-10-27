@@ -150,10 +150,13 @@ export class DistortionEffect extends Effect {
     );
 
     // Update property references
-    this.waveFrequency = this.getProperty("waveFrequency") ?? this.waveFrequency;
-    this.waveAmplitude = this.getProperty("waveAmplitude") ?? this.waveAmplitude;
+    this.waveFrequency =
+      this.getProperty("waveFrequency") ?? this.waveFrequency;
+    this.waveAmplitude =
+      this.getProperty("waveAmplitude") ?? this.waveAmplitude;
     this.time = this.getProperty("time") ?? this.time;
-    this.distortionType = this.getProperty("distortionType") ?? this.distortionType;
+    this.distortionType =
+      this.getProperty("distortionType") ?? this.distortionType;
     this.tint = this.getProperty("tint") || this.tint;
 
     // Compute MVP matrix

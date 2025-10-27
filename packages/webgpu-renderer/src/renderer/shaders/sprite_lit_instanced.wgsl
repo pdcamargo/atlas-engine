@@ -3,15 +3,17 @@
 // Supports full lighting calculations per-fragment
 
 struct SpriteInstance {
-  // World position (x, y) in world space (8 bytes)
-  position: vec2<f32>,
+  // World position (x, y, z) in world space (12 bytes + 4 padding = 16 bytes aligned)
+  position: vec3<f32>,
+  _padding0: f32, // Padding for alignment
   // Size (width, height) in world units (8 bytes)
   size: vec2<f32>,
+  _padding1: vec2<f32>, // Padding to align frame to 16 bytes
   // Texture frame (x, y, width, height) in normalized coordinates (16 bytes)
   frame: vec4<f32>,
   // Tint color (r, g, b, a) (16 bytes)
   tint: vec4<f32>,
-  // Total: 48 bytes
+  // Total: 64 bytes (properly aligned)
 }
 
 // Lighting uniforms
@@ -80,13 +82,14 @@ fn vertexMain(
   let instance = instances[instanceIndex];
 
   // Compute world position on GPU
-  let worldPos2D = instance.position + input.position * instance.size;
+  let worldPos2D = instance.position.xy + input.position * instance.size;
+  let worldPos = vec3f(worldPos2D, instance.position.z);
 
   // Apply view-projection matrix
-  output.position = viewProjectionMatrix * vec4f(worldPos2D, 0.0, 1.0);
+  output.position = viewProjectionMatrix * vec4f(worldPos, 1.0);
 
-  // Pass world position for lighting (convert to 3D)
-  output.worldPos = vec3f(worldPos2D, 0.0);
+  // Pass world position for lighting (with correct z)
+  output.worldPos = worldPos;
 
   // Map UV coordinates to the sprite's frame
   output.texcoord = instance.frame.xy + input.texcoord * instance.frame.zw;

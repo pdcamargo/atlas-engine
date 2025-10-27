@@ -203,7 +203,7 @@ export class TileMapChunk {
         0,
         instanceDataInfo.data.buffer,
         0,
-        instanceDataInfo.count * 48 // 48 bytes per instance (GPU-optimized)
+        instanceDataInfo.count * 64 // 64 bytes per instance (with z-coordinate and padding)
       );
 
       // Get or create texture view

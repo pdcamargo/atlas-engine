@@ -35,7 +35,9 @@ export class OutlineEffect extends Effect {
   public outlineColor: Color;
   public outlineThickness: number;
 
-  constructor(config: { color?: Color; thickness?: number; order?: number } = {}) {
+  constructor(
+    config: { color?: Color; thickness?: number; order?: number } = {}
+  ) {
     super(config.order ?? -1); // Default: render before sprite
 
     this.outlineColor = config.color || new Color(1, 1, 1, 1);
@@ -49,7 +51,11 @@ export class OutlineEffect extends Effect {
   /**
    * Get or create the render pipeline
    */
-  private getPipeline(device: GPUDevice, format: GPUTextureFormat, bufferLayouts: GPUVertexBufferLayout[]): GPURenderPipeline {
+  private getPipeline(
+    device: GPUDevice,
+    format: GPUTextureFormat,
+    bufferLayouts: GPUVertexBufferLayout[]
+  ): GPURenderPipeline {
     if (!this.pipeline) {
       const vertexModule = OUTLINE_SHADER.getVertexModule(device);
       const fragmentModule = OUTLINE_SHADER.getFragmentModule(device);
@@ -91,7 +97,7 @@ export class OutlineEffect extends Effect {
       this.bindGroupLayout = this.pipeline.getBindGroupLayout(0);
 
       // Debug: log the expected buffer size
-      console.log('[OutlineEffect] Bind group layout created');
+      console.log("[OutlineEffect] Bind group layout created");
     }
 
     return this.pipeline;
@@ -123,7 +129,8 @@ export class OutlineEffect extends Effect {
 
     // Update property references
     this.outlineColor = this.getProperty("outlineColor") || this.outlineColor;
-    this.outlineThickness = this.getProperty("outlineThickness") ?? this.outlineThickness;
+    this.outlineThickness =
+      this.getProperty("outlineThickness") ?? this.outlineThickness;
 
     // Compute MVP matrix
     const modelMatrix = sprite.getWorldMatrix();

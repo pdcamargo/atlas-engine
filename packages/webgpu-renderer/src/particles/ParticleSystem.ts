@@ -78,7 +78,9 @@ export class ParticleSystem {
     });
 
     // Initialize particles as dead
-    const initialData = new Float32Array(particleSize / 4 * this.maxParticles);
+    const initialData = new Float32Array(
+      (particleSize / 4) * this.maxParticles
+    );
     for (let i = 0; i < this.maxParticles; i++) {
       const offset = (particleSize / 4) * i;
       initialData[offset + 24] = 0.0; // alive = 0.0 (dead)
@@ -238,7 +240,7 @@ export class ParticleSystem {
       case "multiply":
         blend = {
           color: {
-            srcFactor: "dst-color",
+            srcFactor: "dst-alpha",
             dstFactor: "zero",
             operation: "add",
           },
@@ -332,7 +334,7 @@ export class ParticleSystem {
 
     // Bind group 1 for render (texture + sampler)
     const textureView = this.texture
-      ? this.texture.view!
+      ? this.texture.view
       : this.defaultTexture!.createView();
 
     this.renderBindGroup1 = this.device.createBindGroup({
@@ -343,7 +345,6 @@ export class ParticleSystem {
       ],
     });
   }
-
 
   /**
    * Update emitter configuration
@@ -467,12 +468,17 @@ export class ParticleSystem {
    * Render particles
    */
   render(renderPass: GPURenderPassEncoder, vpMatrix: Float32Array): void {
-    if (!this.renderPipeline || !this.renderBindGroup0 || !this.renderBindGroup1 || !this.vpMatrixBuffer) {
+    if (
+      !this.renderPipeline ||
+      !this.renderBindGroup0 ||
+      !this.renderBindGroup1 ||
+      !this.vpMatrixBuffer
+    ) {
       return;
     }
 
     // Update VP matrix buffer
-    this.device.queue.writeBuffer(this.vpMatrixBuffer, 0, vpMatrix);
+    this.device.queue.writeBuffer(this.vpMatrixBuffer, 0, vpMatrix.buffer);
 
     // Set pipeline and bind groups
     renderPass.setPipeline(this.renderPipeline);

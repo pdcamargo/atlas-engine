@@ -75,7 +75,12 @@ export class ChromaticAberrationEffect extends PostProcessEffect {
     width: number,
     height: number
   ): void {
-    if (!this.pipeline || !this.uniformBuffer || !this.fullscreenQuad || !this.sampler) {
+    if (
+      !this.pipeline ||
+      !this.uniformBuffer ||
+      !this.fullscreenQuad ||
+      !this.sampler
+    ) {
       throw new Error("ChromaticAberrationEffect not initialized");
     }
 

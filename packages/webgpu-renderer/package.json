@@ -7,14 +7,16 @@
   "license": "MIT",
   "scripts": {
     "lint": "eslint \"**/*.ts\"",
-    "build": "tsc"
+    "build": "tsdown"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@repo/utils": "workspace:*",
+    "@types/node": "^24.9.1",
     "@webgpu/types": "^0.1.64",
     "eslint": "^8.57.0",
+    "tsdown": "^0.15.10",
     "typescript": "5.5.4"
   },
   "dependencies": {

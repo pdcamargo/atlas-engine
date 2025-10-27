@@ -11,11 +11,24 @@ import {
 import { Material } from "../materials/Material";
 import { DEFAULT_SPRITE_MATERIAL } from "../materials/SpriteMaterial";
 import { Effect } from "../effects/Effect";
+import { PixelsPerUnit } from "../ecs/resources/pixels-per-unit";
 
 /**
  * Sprite class for rendering textured quads
  * Supports both pre-loaded Textures and lazy-loaded Handles
  * Now supports custom materials and visual effects
+ *
+ * Dimensions are specified in PIXELS and automatically converted to world units
+ * using the global PixelsPerUnit setting (default: 100 pixels = 1 world unit).
+ *
+ * Example:
+ * ```typescript
+ * // Set global PPU (before creating sprites)
+ * PixelsPerUnit.setGlobal(16); // 16 pixels = 1 world unit
+ *
+ * // Create a 16x16 pixel sprite (becomes 1x1 world units)
+ * const sprite = new Sprite(texture, 16, 16);
+ * ```
  */
 @Serializable()
 export class Sprite extends SceneNode {
@@ -43,15 +56,16 @@ export class Sprite extends SceneNode {
 
   constructor(
     texture: Texture | Handle<ImageAsset> | null = null,
-    width: number = 1,
-    height: number = 1,
+    widthInPixels: number = 100,
+    heightInPixels: number = 100,
     id?: string
   ) {
     super(id);
 
     this.texture = texture;
-    this.width = width;
-    this.height = height;
+    // Convert pixel dimensions to world units using global PixelsPerUnit
+    this.width = PixelsPerUnit.toWorldUnits(widthInPixels);
+    this.height = PixelsPerUnit.toWorldUnits(heightInPixels);
     this.frame = new Rect(0, 0, 1, 1); // Default to full texture
     this.tint = Color.white(); // Default to white tint
   }
@@ -80,11 +94,11 @@ export class Sprite extends SceneNode {
   }
 
   /**
-   * Set the size of the sprite
+   * Set the size of the sprite (in pixels)
    */
-  setSize(width: number, height: number): void {
-    this.width = width;
-    this.height = height;
+  setSize(widthInPixels: number, heightInPixels: number): void {
+    this.width = PixelsPerUnit.toWorldUnits(widthInPixels);
+    this.height = PixelsPerUnit.toWorldUnits(heightInPixels);
   }
 
   /**

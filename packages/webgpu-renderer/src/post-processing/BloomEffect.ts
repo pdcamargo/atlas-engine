@@ -43,10 +43,10 @@ export class BloomEffect extends PostProcessEffect {
   private textureHeight: number = 0;
 
   // Effect parameters
-  public threshold: number;      // Luminance threshold (0-1)
-  public intensity: number;      // Bright pixel intensity multiplier
-  public bloomStrength: number;  // Final bloom mix strength
-  public blurPasses: number;     // Number of blur iterations (1-3 recommended)
+  public threshold: number; // Luminance threshold (0-1)
+  public intensity: number; // Bright pixel intensity multiplier
+  public bloomStrength: number; // Final bloom mix strength
+  public blurPasses: number; // Number of blur iterations (1-3 recommended)
 
   constructor(
     config: {
@@ -207,7 +207,8 @@ export class BloomEffect extends PostProcessEffect {
     // Update properties
     this.threshold = this.getProperty("threshold") ?? this.threshold;
     this.intensity = this.getProperty("intensity") ?? this.intensity;
-    this.bloomStrength = this.getProperty("bloomStrength") ?? this.bloomStrength;
+    this.bloomStrength =
+      this.getProperty("bloomStrength") ?? this.bloomStrength;
     this.blurPasses = this.getProperty("blurPasses") ?? this.blurPasses;
 
     // Create or recreate intermediate textures if size changed
@@ -221,21 +222,24 @@ export class BloomEffect extends PostProcessEffect {
       this.brightTexture = device.createTexture({
         size: { width, height },
         format: sourceTexture.format,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         label: "Bloom Bright Texture",
       });
 
       this.blurHorizontalTexture = device.createTexture({
         size: { width, height },
         format: sourceTexture.format,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         label: "Bloom Blur Horizontal Texture",
       });
 
       this.blurVerticalTexture = device.createTexture({
         size: { width, height },
         format: sourceTexture.format,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         label: "Bloom Blur Vertical Texture",
       });
 
@@ -244,7 +248,11 @@ export class BloomEffect extends PostProcessEffect {
     }
 
     // Validate textures exist
-    if (!this.brightTexture || !this.blurHorizontalTexture || !this.blurVerticalTexture) {
+    if (
+      !this.brightTexture ||
+      !this.blurHorizontalTexture ||
+      !this.blurVerticalTexture
+    ) {
       throw new Error("Bloom intermediate textures not created");
     }
 
@@ -252,7 +260,11 @@ export class BloomEffect extends PostProcessEffect {
     const brightPassUniforms = new Float32Array(4);
     brightPassUniforms[0] = this.threshold;
     brightPassUniforms[1] = this.intensity;
-    device.queue.writeBuffer(this.brightPassUniformBuffer, 0, brightPassUniforms);
+    device.queue.writeBuffer(
+      this.brightPassUniformBuffer,
+      0,
+      brightPassUniforms
+    );
 
     const brightPassBindGroup = device.createBindGroup({
       layout: this.brightPassLayout!,
@@ -290,12 +302,19 @@ export class BloomEffect extends PostProcessEffect {
       blurHorizontalUniforms[1] = 0.0; // direction.y
       blurHorizontalUniforms[2] = 1.0 / width; // texelSize.x
       blurHorizontalUniforms[3] = 1.0 / height; // texelSize.y
-      device.queue.writeBuffer(this.blurHorizontalUniformBuffer, 0, blurHorizontalUniforms);
+      device.queue.writeBuffer(
+        this.blurHorizontalUniformBuffer,
+        0,
+        blurHorizontalUniforms
+      );
 
       const blurHorizontalBindGroup = device.createBindGroup({
         layout: this.blurLayout!,
         entries: [
-          { binding: 0, resource: { buffer: this.blurHorizontalUniformBuffer } },
+          {
+            binding: 0,
+            resource: { buffer: this.blurHorizontalUniformBuffer },
+          },
           { binding: 1, resource: this.sampler },
           { binding: 2, resource: blurInput.createView() },
         ],
@@ -323,7 +342,11 @@ export class BloomEffect extends PostProcessEffect {
       blurVerticalUniforms[1] = 1.0; // direction.y
       blurVerticalUniforms[2] = 1.0 / width; // texelSize.x
       blurVerticalUniforms[3] = 1.0 / height; // texelSize.y
-      device.queue.writeBuffer(this.blurVerticalUniformBuffer, 0, blurVerticalUniforms);
+      device.queue.writeBuffer(
+        this.blurVerticalUniformBuffer,
+        0,
+        blurVerticalUniforms
+      );
 
       const blurVerticalBindGroup = device.createBindGroup({
         layout: this.blurLayout!,
