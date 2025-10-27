@@ -274,17 +274,21 @@ export class WebgpuRenderer {
   /**
    * Create or recreate depth texture to match canvas size
    */
-  private createDepthTexture(): void {
+  private createDepthTexture(width?: number, height?: number): void {
     // Destroy old depth texture if it exists
     if (this.depthTexture) {
       this.depthTexture.destroy();
     }
 
-    // Create new depth texture matching canvas dimensions
+    // Use provided dimensions or fall back to canvas dimensions
+    const textureWidth = width ?? this.canvas.width;
+    const textureHeight = height ?? this.canvas.height;
+
+    // Create new depth texture matching specified dimensions
     this.depthTexture = this.device.createTexture({
       size: {
-        width: this.canvas.width,
-        height: this.canvas.height,
+        width: textureWidth,
+        height: textureHeight,
         depthOrArrayLayers: 1,
       },
       format: "depth24plus",
@@ -800,9 +804,34 @@ export class WebgpuRenderer {
     }
 
     // Render target: either scene texture (if post-processing) or canvas
-    const renderTargetView = hasPostProcessing
-      ? this.sceneTexture!.createView()
-      : this.context.getCurrentTexture().createView();
+    let renderTargetView: GPUTextureView;
+    let renderTargetWidth: number;
+    let renderTargetHeight: number;
+
+    if (hasPostProcessing) {
+      renderTargetView = this.sceneTexture!.createView();
+      renderTargetWidth = this.sceneTexture!.width;
+      renderTargetHeight = this.sceneTexture!.height;
+    } else {
+      const canvasTexture = this.context.getCurrentTexture();
+      renderTargetView = canvasTexture.createView();
+      renderTargetWidth = canvasTexture.width;
+      renderTargetHeight = canvasTexture.height;
+    }
+
+    // Double-check depth texture matches render target size
+    // This is critical to prevent size mismatch errors
+    if (
+      this.depthTexture &&
+      (this.depthTexture.width !== renderTargetWidth ||
+        this.depthTexture.height !== renderTargetHeight)
+    ) {
+      console.warn(
+        `Depth texture size mismatch detected: depth=${this.depthTexture.width}x${this.depthTexture.height}, target=${renderTargetWidth}x${renderTargetHeight}. Recreating depth texture.`
+      );
+      // Recreate with the ACTUAL render target dimensions
+      this.createDepthTexture(renderTargetWidth, renderTargetHeight);
+    }
 
     // Main scene render pass
     const renderPass = commandEncoder.beginRenderPass({
@@ -1252,8 +1281,8 @@ export class WebgpuRenderer {
       alphaMode: "premultiplied",
     });
 
-    // Recreate depth texture to match new canvas size
-    this.createDepthTexture();
+    // NOTE: Depth texture resize is now handled automatically in render()
+    // by comparing against actual render target dimensions
   }
 
   setClearColor(r: number, g: number, b: number, a: number = 1): void {
