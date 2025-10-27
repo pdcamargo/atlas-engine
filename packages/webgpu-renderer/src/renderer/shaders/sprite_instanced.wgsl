@@ -67,8 +67,15 @@ fn vertexMain(
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   // Sample texture at the UV coordinate
   let textureColor = textureSample(spriteTexture, textureSampler, input.texcoord);
-  
+
   // Apply tint
-  return textureColor * input.tint;
+  let finalColor = textureColor * input.tint;
+
+  // Discard fully transparent pixels to prevent depth buffer writes
+  if (finalColor.a < 0.01) {
+    discard;
+  }
+
+  return finalColor;
 }
 

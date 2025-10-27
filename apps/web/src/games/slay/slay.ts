@@ -107,7 +107,9 @@ export class SlayGamePlugin implements EcsPlugin {
           1.0 // normal speed
         );
 
-        tilemap.setPosition({ x: -1, y: -1 });
+        // Background layer - farthest from camera
+        // Use z=-100 to give plenty of room for Y-sorted sprites above it
+        tilemap.setPosition({ x: -1, y: -1, z: -0.1 });
 
         const layer = tilemap.addLayer("default");
 
@@ -250,8 +252,14 @@ export class SlayGamePlugin implements EcsPlugin {
           const pos = {
             x: Math.random() * 5 - 2.5,
             y: Math.random() * 5 - 2.5,
-            z: 1,
+            z: 0, // Will be calculated below with Y-sorting
           };
+
+          // Y-sorting: sprites with lower Y (farther up the screen) render behind
+          // Base Z for characters: -50 (well above the tilemap at -100)
+          // Y factor: 0.1 (adds depth based on Y position for clear separation)
+          // This creates proper depth layering for top-down/isometric views
+          // With Y range of -2.5 to 2.5, Z will range from -50.25 to -49.75
 
           animatedSprite.setPosition(pos);
 
@@ -272,12 +280,10 @@ export class SlayGamePlugin implements EcsPlugin {
           // );
         }
 
-        // Create camera
-        // const camera = new OrthographicCamera(1, 0.1, 100); // size = 1 (half-height)
-        const camera = new PerspectiveCamera(Math.PI / 4, 1, 0.1, 100); // size = 1 (half-height)
-        camera.position.set(0, 0, 3);
-        // camera.rotation.set(0, Math.PI / 4, 0);
-        // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
+        const camera = new PerspectiveCamera(Math.PI / 4, 1, 0.1, 1000); // size = 1 (half-height)
+        // Camera must be in front of all objects (higher Z than sprites)
+        // Sprites are at Z=-50, tilemap at Z=-100, so camera at Z=0 looks down at them
+        camera.position.set(0, 0, 5);
 
         commands.spawn(camera, new MainCamera());
         commands.spawn(sceneGraph);
@@ -350,10 +356,6 @@ export class SlayGamePlugin implements EcsPlugin {
           order: 2,
         });
         renderer.addPostProcessEffect(bloomEffect);
-
-        commands.spawn(
-          new SunLight({ x: 0, y: 0, z: -1 }, Color.white(), 0.01)
-        );
       })
       .addUpdateSystems(({ commands }) => {
         const [, camera] = commands

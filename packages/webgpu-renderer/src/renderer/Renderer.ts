@@ -97,6 +97,10 @@ export class WebgpuRenderer {
   // VP matrix uniform buffer for instanced rendering
   private vpMatrixBuffer?: GPUBuffer;
 
+  // Depth buffer for hardware depth testing
+  private depthTexture?: GPUTexture;
+  private depthTextureView?: GPUTextureView;
+
   // Post-processing effects
   private postProcessEffects: PostProcessEffect[] = [];
   private sceneTexture?: GPUTexture;
@@ -192,6 +196,9 @@ export class WebgpuRenderer {
       alphaMode: "premultiplied",
     });
 
+    // Create depth texture for hardware depth testing
+    this.createDepthTexture();
+
     // Create shared quad geometry
     const arrays = primitives.createXYQuadVertices({ size: 1 });
     this.quadBuffers = createBuffersAndAttributesFromArrays(
@@ -265,6 +272,30 @@ export class WebgpuRenderer {
   }
 
   /**
+   * Create or recreate depth texture to match canvas size
+   */
+  private createDepthTexture(): void {
+    // Destroy old depth texture if it exists
+    if (this.depthTexture) {
+      this.depthTexture.destroy();
+    }
+
+    // Create new depth texture matching canvas dimensions
+    this.depthTexture = this.device.createTexture({
+      size: {
+        width: this.canvas.width,
+        height: this.canvas.height,
+        depthOrArrayLayers: 1,
+      },
+      format: "depth24plus",
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      label: "Depth Texture",
+    });
+
+    this.depthTextureView = this.depthTexture.createView();
+  }
+
+  /**
    * Create render pipelines for sprites and primitives
    */
   private async createPipelines(): Promise<void> {
@@ -299,6 +330,11 @@ export class WebgpuRenderer {
       },
       primitive: {
         topology: "triangle-list",
+      },
+      depthStencil: {
+        format: "depth24plus",
+        depthWriteEnabled: true,
+        depthCompare: "less",
       },
     });
 
@@ -335,6 +371,11 @@ export class WebgpuRenderer {
         topology: "triangle-list",
         cullMode: "back",
       },
+      depthStencil: {
+        format: "depth24plus",
+        depthWriteEnabled: true,
+        depthCompare: "less",
+      },
     });
 
     // Lit sprite pipeline
@@ -368,6 +409,11 @@ export class WebgpuRenderer {
       },
       primitive: {
         topology: "triangle-list",
+      },
+      depthStencil: {
+        format: "depth24plus",
+        depthWriteEnabled: true,
+        depthCompare: "less",
       },
     });
 
@@ -404,6 +450,11 @@ export class WebgpuRenderer {
         topology: "triangle-list",
         cullMode: "back",
       },
+      depthStencil: {
+        format: "depth24plus",
+        depthWriteEnabled: true,
+        depthCompare: "less",
+      },
     });
 
     // Primitive pipeline
@@ -438,6 +489,11 @@ export class WebgpuRenderer {
       },
       primitive: {
         topology: "triangle-list",
+      },
+      depthStencil: {
+        format: "depth24plus",
+        depthWriteEnabled: true,
+        depthCompare: "less",
       },
     });
   }
@@ -758,6 +814,12 @@ export class WebgpuRenderer {
           storeOp: "store",
         },
       ],
+      depthStencilAttachment: {
+        view: this.depthTextureView!,
+        depthClearValue: 1.0,
+        depthLoadOp: "clear",
+        depthStoreOp: "store",
+      },
     });
 
     sceneGraph.traverseVisible((node) => {
@@ -1189,6 +1251,9 @@ export class WebgpuRenderer {
       format: this.format,
       alphaMode: "premultiplied",
     });
+
+    // Recreate depth texture to match new canvas size
+    this.createDepthTexture();
   }
 
   setClearColor(r: number, g: number, b: number, a: number = 1): void {

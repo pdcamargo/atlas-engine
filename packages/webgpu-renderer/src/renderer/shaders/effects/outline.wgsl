@@ -33,7 +33,9 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let centeredPos = input.position - vec2f(0.5, 0.5);
   let expandedPos = centeredPos * (1.0 + uniforms.params.x * 2.0) + vec2f(0.5, 0.5);
 
-  output.position = uniforms.mvpMatrix * vec4f(expandedPos, 0.0, 1.0);
+  // Render outline slightly behind the sprite with minimal Z offset
+  // Use 0.01 offset to stay within the sprite's depth layer (Y-sorting uses 0.1 per unit)
+  output.position = uniforms.mvpMatrix * vec4f(expandedPos, -0.01, 1.0);
   output.texcoord = uniforms.frame.xy + input.texcoord * uniforms.frame.zw;
 
   // Calculate distance from edge (0 at edge, 1 at center)
@@ -52,7 +54,12 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let outlineFactor = smoothstep(0.0, 0.3, 1.0 - input.edgeDistance);
 
   // Outline only shows on edges
-  let alpha = textureColor.a * outlineFactor;
+  let finalAlpha = textureColor.a * outlineFactor * uniforms.outlineColor.a;
 
-  return vec4f(uniforms.outlineColor.rgb, alpha * uniforms.outlineColor.a);
+  // Discard fully transparent pixels to prevent depth buffer writes
+  if (finalAlpha < 0.01) {
+    discard;
+  }
+
+  return vec4f(uniforms.outlineColor.rgb, finalAlpha);
 }

@@ -62,6 +62,12 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   // Sample texture with distorted UVs
   let textureColor = textureSample(textureData, textureSampler, distortedUV);
+  let finalColor = textureColor * uniforms.tint;
 
-  return textureColor * uniforms.tint;
+  // Discard fully transparent pixels to prevent depth buffer writes
+  if (finalColor.a < 0.01) {
+    discard;
+  }
+
+  return finalColor;
 }

@@ -35,5 +35,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let textureColor = textureSample(textureData, textureSampler, input.texcoord);
-  return textureColor * uniforms.tint;
+  let finalColor = textureColor * uniforms.tint;
+
+  // Discard fully transparent pixels to prevent depth buffer writes
+  if (finalColor.a < 0.01) {
+    discard;
+  }
+
+  return finalColor;
 }

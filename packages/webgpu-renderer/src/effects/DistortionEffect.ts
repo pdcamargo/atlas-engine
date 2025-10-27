@@ -117,6 +117,11 @@ export class DistortionEffect extends Effect {
         primitive: {
           topology: "triangle-list",
         },
+        depthStencil: {
+          format: "depth24plus",
+          depthWriteEnabled: true,
+          depthCompare: "less",
+        },
       });
 
       this.bindGroupLayout = this.pipeline.getBindGroupLayout(0);

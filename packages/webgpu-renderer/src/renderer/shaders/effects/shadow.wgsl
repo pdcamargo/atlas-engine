@@ -58,7 +58,9 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   // Position at bottom-center of sprite quad + offset
   let finalPos = scaledPos + vec2f(0.5 + offsetX, 0.0 + offsetY);
 
-  output.position = uniforms.mvpMatrix * vec4f(finalPos, 0.0, 1.0);
+  // Render shadow slightly behind the sprite with minimal Z offset
+  // Use 0.02 offset to stay within the sprite's depth layer (Y-sorting uses 0.1 per unit)
+  output.position = uniforms.mvpMatrix * vec4f(finalPos, -0.02, 1.0);
   output.uv = input.texcoord;
 
   return output;
@@ -91,6 +93,11 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Reduce opacity based on distance (farther = more transparent)
   let distanceFade = 1.0 - (distance * 0.7);
   let finalAlpha = alpha * distanceFade * uniforms.shadowColor.a;
+
+  // Discard fully transparent pixels to prevent depth buffer writes
+  if (finalAlpha < 0.01) {
+    discard;
+  }
 
   return vec4f(uniforms.shadowColor.rgb, finalAlpha);
 }
