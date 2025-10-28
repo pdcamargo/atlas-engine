@@ -5,7 +5,6 @@ import {
   ImageAsset,
   LoadState,
   Color,
-  Rect,
   Commands,
 } from "@atlas/core";
 import {
@@ -195,10 +194,18 @@ function loadTiledMap(
             const row = Math.floor(tileId / tileset.columns);
 
             // Calculate pixel coordinates with margin and spacing
-            const x = tileset.margin + col * (tileset.tilewidth + tileset.spacing);
-            const y = tileset.margin + row * (tileset.tileheight + tileset.spacing);
+            const x =
+              tileset.margin + col * (tileset.tilewidth + tileset.spacing);
+            const y =
+              tileset.margin + row * (tileset.tileheight + tileset.spacing);
 
-            return { x, y, width: tileset.tilewidth, height: tileset.tileheight, duration: frame.duration };
+            return {
+              x,
+              y,
+              width: tileset.tilewidth,
+              height: tileset.tileheight,
+              duration: frame.duration,
+            };
           });
 
           // Store pixel data in metadata for deferred normalization
@@ -208,8 +215,8 @@ function loadTiledMap(
             loop: true,
             speed: 1.0,
             metadata: {
-              _tiledFrameData: frameData
-            }
+              _tiledFrameData: frameData,
+            },
           });
         }
       }
