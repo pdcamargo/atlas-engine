@@ -321,3 +321,121 @@ export class FlexItem {
     if (config?.order !== undefined) this.order = config.order;
   }
 }
+
+/**
+ * CSS Grid layout component
+ */
+export class GridLayout {
+  public display: "grid" | "inline-grid" = "grid";
+  public templateColumns?: string;
+  public templateRows?: string;
+  public templateAreas?: string;
+  public gap?: string;
+  public rowGap?: string;
+  public columnGap?: string;
+  public justifyItems?: "start" | "end" | "center" | "stretch";
+  public alignItems?: "start" | "end" | "center" | "stretch" | "baseline";
+  public justifyContent?:
+    | "start"
+    | "end"
+    | "center"
+    | "stretch"
+    | "space-around"
+    | "space-between"
+    | "space-evenly";
+  public alignContent?:
+    | "start"
+    | "end"
+    | "center"
+    | "stretch"
+    | "space-around"
+    | "space-between"
+    | "space-evenly";
+  public autoColumns?: string;
+  public autoRows?: string;
+  public autoFlow?: "row" | "column" | "row dense" | "column dense";
+
+  constructor(config?: {
+    display?: "grid" | "inline-grid";
+    templateColumns?: string;
+    templateRows?: string;
+    templateAreas?: string;
+    gap?: number | string;
+    rowGap?: number | string;
+    columnGap?: number | string;
+    justifyItems?: "start" | "end" | "center" | "stretch";
+    alignItems?: "start" | "end" | "center" | "stretch" | "baseline";
+    justifyContent?:
+      | "start"
+      | "end"
+      | "center"
+      | "stretch"
+      | "space-around"
+      | "space-between"
+      | "space-evenly";
+    alignContent?:
+      | "start"
+      | "end"
+      | "center"
+      | "stretch"
+      | "space-around"
+      | "space-between"
+      | "space-evenly";
+    autoColumns?: string;
+    autoRows?: string;
+    autoFlow?: "row" | "column" | "row dense" | "column dense";
+  }) {
+    if (config?.display) this.display = config.display;
+    if (config?.templateColumns) this.templateColumns = config.templateColumns;
+    if (config?.templateRows) this.templateRows = config.templateRows;
+    if (config?.templateAreas) this.templateAreas = config.templateAreas;
+    if (config?.gap !== undefined) {
+      this.gap = typeof config.gap === "number" ? `${config.gap}px` : config.gap;
+    }
+    if (config?.rowGap !== undefined) {
+      this.rowGap =
+        typeof config.rowGap === "number" ? `${config.rowGap}px` : config.rowGap;
+    }
+    if (config?.columnGap !== undefined) {
+      this.columnGap =
+        typeof config.columnGap === "number"
+          ? `${config.columnGap}px`
+          : config.columnGap;
+    }
+    if (config?.justifyItems) this.justifyItems = config.justifyItems;
+    if (config?.alignItems) this.alignItems = config.alignItems;
+    if (config?.justifyContent) this.justifyContent = config.justifyContent;
+    if (config?.alignContent) this.alignContent = config.alignContent;
+    if (config?.autoColumns) this.autoColumns = config.autoColumns;
+    if (config?.autoRows) this.autoRows = config.autoRows;
+    if (config?.autoFlow) this.autoFlow = config.autoFlow;
+  }
+}
+
+/**
+ * CSS Grid item properties
+ */
+export class GridItem {
+  public gridColumn?: string;
+  public gridRow?: string;
+  public gridArea?: string;
+  public justifySelf?: "start" | "end" | "center" | "stretch";
+  public alignSelf?: "start" | "end" | "center" | "stretch" | "baseline";
+  public order?: number;
+
+  constructor(config?: {
+    gridColumn?: string;
+    gridRow?: string;
+    gridArea?: string;
+    justifySelf?: "start" | "end" | "center" | "stretch";
+    alignSelf?: "start" | "end" | "center" | "stretch" | "baseline";
+    order?: number;
+  }) {
+    if (config?.gridColumn) this.gridColumn = config.gridColumn;
+    if (config?.gridRow) this.gridRow = config.gridRow;
+    if (config?.gridArea) this.gridArea = config.gridArea;
+    if (config?.justifySelf) this.justifySelf = config.justifySelf;
+    if (config?.alignSelf) this.alignSelf = config.alignSelf;
+    if (config?.order !== undefined) this.order = config.order;
+  }
+}

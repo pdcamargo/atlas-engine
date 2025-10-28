@@ -121,8 +121,15 @@ interface EcsPlugin {
 - Asset-based audio loading
 
 #### `@atlas/ui` - User Interface
-- UI component system integrated with ECS
-- UI bundles for common patterns
+- Modern, ECS-first UI system rendering to HTML/DOM
+- Three-phase update cycle: DOM sync → Layout → Interaction
+- **Components**: Core (`UiNode`, `UiElement`, `UiRoot`, `UiClass`, `UiStyle`), Layout (`FlexLayout`, `GridLayout`, `Spacing`, `Size`, `Position`, `FlexItem`, `GridItem`), Appearance (`Background`, `Border`, `Shadow`, `Overflow`, `Opacity`, `Cursor`), Text (`Text`, `TextStyle`, `TextColor`, `TextAlign`), Interactive (`OnClick`, `OnHoverEnter`, `OnHoverExit`, `OnFocus`, `OnBlur`, `Disabled`)
+- **Runtime markers**: `Hovered`, `Focused` (added/removed automatically)
+- **Bundles**: `BoxBundle`, `ButtonBundle`, `TextBundle`, `FlexBundle`, `GridBundle`
+- Event-driven interaction with custom event classes
+- Automatic DOM synchronization with ECS entities
+- Full flexbox and CSS Grid layout support with component-based configuration
+- See [packages/ui/README.md](packages/ui/README.md) for complete documentation
 
 #### `@atlas/tiled` - Tiled Map Editor Integration
 - Complete ECS integration for Tiled Map Editor (.tmj, .tsj files)
@@ -289,7 +296,7 @@ Example games in `apps/web/src/games/`:
 - `boid` - Flocking simulation (compute shaders)
 - `game-of-life` - Cellular automata (WebGPU compute)
 - `animator-demo` - Animation showcase
-- `ui-demo` - UI system demonstration
+- `ui-demo` - UI system demonstration (game menu with buttons, hover effects, custom events)
 - `serialization-demo` - Save/load functionality
 - `slay` - Full game example
 - `factory` - Another game example
@@ -612,6 +619,310 @@ The compute system integrates seamlessly with Atlas ECS:
 - **Async systems**: Use `.then()` for non-blocking GPU reads
 - **Visual updates**: Read compute results, update sprite positions/colors
 - **Input handling**: React to keyboard/mouse for interactive simulations
+
+## UI System
+
+The `@atlas/ui` package provides a modern, ECS-first UI system that renders to HTML/DOM instead of WebGPU canvas. This allows leveraging browser capabilities while maintaining ECS consistency.
+
+### Architecture Overview
+
+The UI system follows a three-phase update cycle executed every frame:
+
+1. **DOM Sync Phase** (`domSyncSystem`) - Creates and maintains DOM elements synchronized with ECS entities
+2. **Layout Phase** (`layoutSystem`) - Applies CSS properties from ECS components to DOM elements
+3. **Interaction Phase** (`interactionSystem`) - Attaches DOM event listeners and fires ECS events
+
+### Global UI Root
+
+The system creates a global `#atlas-ui-root` wrapper div mounted to `document.body`:
+
+- `position: absolute` covering the entire viewport
+- `z-index: 999` rendering above WebGPU canvas
+- `pointer-events: none` on wrapper (allows click-through to canvas)
+- `pointer-events: auto` on child elements (enables interaction)
+
+### Component Categories
+
+**Core Components:**
+- `UiNode` - Marks entity as UI element, holds DOM element reference
+- `UiElement` - Specifies HTML tag ('div', 'button', 'span', etc.)
+- `UiRoot` - Marks element as root container (mounted to global wrapper)
+- `UiClass` - CSS class names with Set-based API
+- `UiStyle` - Inline styles as key-value map
+
+**Layout Components:**
+- `FlexLayout` - Complete flexbox layout (direction, wrap, justify-content, align-items, gap)
+- `FlexItem` - Flex child properties (flex-grow, flex-shrink, flex-basis, align-self, order)
+- `GridLayout` - CSS Grid layout (template-columns/rows, gap, justify/align-items/content, auto-flow)
+- `GridItem` - Grid child properties (grid-column, grid-row, grid-area, justify/align-self)
+- `Spacing` - Margin and padding with flexible notation (all, vertical/horizontal, per-side)
+- `Size` - Width, height, min/max constraints
+- `Position` - Positioning (absolute, relative, fixed) with offsets and z-index
+
+**Appearance Components:**
+- `Background` - Background color, image, size, position, repeat
+- `Border` - Width, style, color (all-side and per-side), border radius
+- `Shadow` - Box shadow and text shadow
+- `Overflow` - Overflow behavior (visible, hidden, scroll, auto)
+- `Opacity` - Element opacity (0-1 range)
+- `Cursor` - Cursor style (pointer, text, grab, etc.)
+
+**Text Components:**
+- `Text` - Text content string (updates DOM `textContent`)
+- `TextStyle` - Font size, weight, family, line-height, letter-spacing, etc.
+- `TextColor` - Text color (defaults to black)
+- `TextAlign` - Text alignment (horizontal and vertical)
+
+**Interactive Components:**
+- `Interactive` - Marks entity as listening to DOM events
+- `OnClick<T>` - Fires custom event on click
+- `OnHoverEnter<T>` / `OnHoverExit<T>` - Fires events on mouse enter/exit
+- `OnFocus<T>` / `OnBlur<T>` - Fires events on focus/blur
+- `Disabled` - Prevents interaction (sets `disabled` attribute)
+- `Hovered` - Runtime marker (added/removed automatically on hover)
+- `Focused` - Runtime marker (added/removed automatically on focus)
+
+### Bundles
+
+Pre-configured component collections for common UI patterns:
+
+**BoxBundle** - Flexible container with layout capabilities
+```typescript
+commands.spawnBundle(BoxBundle, {
+  flexLayout: [{ direction: 'column', gap: 20 }],
+  spacing: [{ padding: { all: 24 } }],
+  size: [{ width: '100%', height: 'auto' }],
+  background: [{ color: '#f0f0f0' }],
+  border: [{ radius: 8 }]
+});
+```
+
+**ButtonBundle** - Interactive button component
+```typescript
+commands.spawnBundle(ButtonBundle, {
+  text: ['Click Me'],  // Required
+  background: [{ color: '#4CAF50' }],
+  spacing: [{ padding: { vertical: 12, horizontal: 24 } }],
+  border: [{ radius: 4 }],
+  cursor: ['pointer']
+});
+```
+
+**TextBundle** - Styled text element
+```typescript
+commands.spawnBundle(TextBundle, {
+  text: ['Hello, World!'],  // Required
+  textStyle: [{ fontSize: 24, fontWeight: 'bold' }],
+  textColor: [{ color: '#333333' }]
+});
+```
+
+**FlexBundle** - Flexbox container
+```typescript
+commands.spawnBundle(FlexBundle, {
+  flexLayout: [{ direction: 'row', gap: 16, justifyContent: 'space-between' }],
+  spacing: [{ padding: { all: 20 } }],
+  size: [{ width: '100%' }],
+  background: [{ color: '#f0f0f0' }]
+});
+```
+
+**GridBundle** - CSS Grid container for 2D layouts
+```typescript
+commands.spawnBundle(GridBundle, {
+  gridLayout: [{
+    templateColumns: 'repeat(3, 1fr)',
+    gap: 16,
+    alignItems: 'center'
+  }],
+  spacing: [{ padding: { all: 20 } }],
+  size: [{ width: '100%' }]
+});
+```
+
+### Usage Patterns
+
+#### Creating UI Elements
+
+**Using bundles (recommended):**
+```typescript
+const button = commands.spawnBundle(ButtonBundle, {
+  text: ['Submit'],
+  background: [{ color: '#2196F3' }]
+})
+.insert(new UiRoot())
+.id();
+```
+
+**Using individual components:**
+```typescript
+const button = commands.spawn(
+  new UiNode(),
+  new UiElement('button'),
+  new Text('Submit'),
+  new Background({ color: '#2196F3' })
+)
+.insert(new UiRoot())
+.id();
+```
+
+#### Building Hierarchies
+
+Use ECS parent-child relationships:
+
+```typescript
+// Create container
+const container = commands.spawnBundle(BoxBundle, {
+  flexLayout: [{ direction: 'column', gap: 16 }]
+})
+.insert(new UiRoot())
+.id();
+
+// Add children
+commands.spawn(new UiNode(), new Text('Title'))
+  .withParent(container);
+
+commands.spawn(new UiNode(), new Text('Subtitle'))
+  .withParent(container);
+```
+
+#### Event-Driven Interaction
+
+**1. Define custom event classes:**
+```typescript
+class ButtonClickEvent {
+  constructor(
+    public entity: Entity,
+    public buttonId?: string
+  ) {}
+}
+```
+
+**2. Register events with app:**
+```typescript
+app.addEvent(ButtonClickEvent);
+```
+
+**3. Add event components to entities:**
+```typescript
+commands.spawn(new UiNode())
+  .insert(new OnClick(ButtonClickEvent, 'submit-btn'));
+```
+
+**4. Handle events in systems:**
+```typescript
+sys(({ events }) => {
+  const reader = events.reader(ButtonClickEvent);
+  for (const event of reader.read()) {
+    console.log('Button clicked:', event.buttonId);
+  }
+});
+```
+
+#### Dynamic Styling with Runtime Markers
+
+React to hover state:
+
+```typescript
+sys(({ commands }) => {
+  // Update hovered buttons
+  for (const [entity, button, hovered] of commands.all(Button, Hovered)) {
+    const background = commands.getComponent(entity, Background);
+    background.color = '#45a049';  // Hover color
+  }
+
+  // Reset non-hovered buttons
+  for (const [entity, button] of commands.all(Button).without(Hovered)) {
+    const background = commands.getComponent(entity, Background);
+    background.color = '#4CAF50';  // Normal color
+  }
+});
+```
+
+#### Flexible Spacing Configuration
+
+The `Spacing` component accepts multiple formats:
+
+```typescript
+// All sides
+{ padding: { all: 16 } }             // "16px"
+{ padding: { all: '1rem' } }         // "1rem"
+
+// Vertical and horizontal
+{ padding: { vertical: 16, horizontal: 24 } }  // "16px 24px"
+
+// Individual sides
+{ padding: { top: 16, right: 24, bottom: 16, left: 24 } }
+
+// Mixed
+{ padding: { top: '2rem', horizontal: 16, bottom: 8 } }
+```
+
+### Complete Example
+
+See [apps/web/src/games/ui-demo/ui-demo.ts](apps/web/src/games/ui-demo/ui-demo.ts) for a full example demonstrating menu layout, interactive buttons, hover effects, and custom events.
+
+```typescript
+import { App, UiPlugin, ButtonBundle, OnClick } from "@atlas/ui";
+
+class ButtonClickEvent {
+  constructor(public entity: Entity) {}
+}
+
+await App.create()
+  .addPlugins(new UiPlugin())
+  .addEvent(ButtonClickEvent)
+  .addStartupSystems(({ commands }) => {
+    // Create menu container
+    const menu = commands.spawnBundle(BoxBundle, {
+      flexLayout: [{ direction: 'column', gap: 20 }],
+      size: [{ width: '400px', height: '100vh' }],
+      background: [{ color: 'rgba(20, 20, 30, 0.95)' }]
+    })
+    .insert(new UiRoot())
+    .id();
+
+    // Add button
+    commands.spawnBundle(ButtonBundle, {
+      text: ['START GAME'],
+      background: [{ color: '#4CAF50' }]
+    })
+    .insert(new OnClick(ButtonClickEvent))
+    .withParent(menu);
+  })
+  .addUpdateSystems(({ events }) => {
+    const reader = events.reader(ButtonClickEvent);
+    for (const event of reader.read()) {
+      console.log('Start game clicked!');
+    }
+  })
+  .run();
+```
+
+### Best Practices
+
+1. **Use bundles for common patterns** - `BoxBundle`, `ButtonBundle`, `TextBundle`
+2. **Define custom events** - Create event classes for each interaction type
+3. **Query runtime markers** - Use `Hovered`, `Focused` to apply visual effects (don't manually add them)
+4. **Leverage ECS hierarchy** - Use `Parent`/`Children` for UI structure
+5. **Prefer components over inline styles** - Use `Background`, `Border`, etc. instead of `UiStyle`
+6. **Register events before use** - Call `app.addEvent(EventClass)` before spawning entities
+
+### Integration with ECS
+
+- **Parent/Children components** - Define UI hierarchy (synced to DOM tree)
+- **Custom events** - User-defined event classes fired through ECS event system
+- **Runtime markers** - `Hovered`, `Focused` added/removed by interaction system
+- **Resource access** - Systems can access global resources like `Input`, `Time`, etc.
+- **Animation** - Can animate UI component properties with `@atlas/animator`
+
+### Performance Considerations
+
+- **DOM sync runs first** to ensure elements exist before styling
+- **Component loops are separated** for better cache locality
+- **DOM updates are minimized** by checking current values before setting
+- **Event listeners are attached once** and reused across frames
+- **Cleanup is automatic** when entities are destroyed
 
 ## Tiled Map Editor Integration
 

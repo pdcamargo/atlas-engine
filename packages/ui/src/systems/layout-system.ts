@@ -2,10 +2,12 @@ import type { Commands } from "@atlas/core";
 import {
   UiNode,
   FlexLayout,
+  GridLayout,
   Spacing,
   Size,
   Position,
   FlexItem,
+  GridItem,
   Background,
   Border,
   Shadow,
@@ -86,6 +88,46 @@ export function layoutSystem({ commands }: { commands: Commands }) {
     if (flexItem.flexBasis !== undefined) style.flexBasis = flexItem.flexBasis;
     if (flexItem.alignSelf !== undefined) style.alignSelf = flexItem.alignSelf;
     if (flexItem.order !== undefined) style.order = `${flexItem.order}`;
+  }
+
+  // Apply GridLayout
+  for (const [entity, uiNode, gridLayout] of commands.all(UiNode, GridLayout)) {
+    if (!uiNode.element) continue;
+    const style = uiNode.element.style;
+
+    if (gridLayout.display) style.display = gridLayout.display;
+    if (gridLayout.templateColumns)
+      style.gridTemplateColumns = gridLayout.templateColumns;
+    if (gridLayout.templateRows)
+      style.gridTemplateRows = gridLayout.templateRows;
+    if (gridLayout.templateAreas)
+      style.gridTemplateAreas = gridLayout.templateAreas;
+    if (gridLayout.gap) style.gap = gridLayout.gap;
+    if (gridLayout.rowGap) style.rowGap = gridLayout.rowGap;
+    if (gridLayout.columnGap) style.columnGap = gridLayout.columnGap;
+    if (gridLayout.justifyItems) style.justifyItems = gridLayout.justifyItems;
+    if (gridLayout.alignItems) style.alignItems = gridLayout.alignItems;
+    if (gridLayout.justifyContent)
+      style.justifyContent = gridLayout.justifyContent;
+    if (gridLayout.alignContent) style.alignContent = gridLayout.alignContent;
+    if (gridLayout.autoColumns) style.gridAutoColumns = gridLayout.autoColumns;
+    if (gridLayout.autoRows) style.gridAutoRows = gridLayout.autoRows;
+    if (gridLayout.autoFlow) style.gridAutoFlow = gridLayout.autoFlow;
+  }
+
+  // Apply GridItem
+  for (const [entity, uiNode, gridItem] of commands.all(UiNode, GridItem)) {
+    if (!uiNode.element) continue;
+    const style = uiNode.element.style;
+
+    if (gridItem.gridColumn !== undefined)
+      style.gridColumn = gridItem.gridColumn;
+    if (gridItem.gridRow !== undefined) style.gridRow = gridItem.gridRow;
+    if (gridItem.gridArea !== undefined) style.gridArea = gridItem.gridArea;
+    if (gridItem.justifySelf !== undefined)
+      style.justifySelf = gridItem.justifySelf;
+    if (gridItem.alignSelf !== undefined) style.alignSelf = gridItem.alignSelf;
+    if (gridItem.order !== undefined) style.order = `${gridItem.order}`;
   }
 
   // Apply Background
