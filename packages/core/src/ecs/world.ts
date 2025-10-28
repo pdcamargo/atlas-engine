@@ -241,6 +241,23 @@ export class World {
     return true;
   }
 
+  /**
+   * Destroys an entity and removes all its components.
+   * @param entity The entity to destroy
+   * @returns A map of removed components, or null if entity didn't exist
+   */
+  public destroyEntity(
+    entity: Entity
+  ): Map<ComponentClass<unknown>, unknown> | null {
+    const archetype = this.#archetypeByEntity.get(entity);
+    if (!archetype) return null;
+
+    const components = archetype.remove(entity);
+    this.#archetypeByEntity.delete(entity);
+
+    return components;
+  }
+
   public debug() {
     // Sort by number of entities (descending) for better readability
     const archetypes = Array.from(this.#archetypeByKey.values())

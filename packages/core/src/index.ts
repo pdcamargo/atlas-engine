@@ -7,6 +7,7 @@ export {
   defineBundle,
   required,
   EntityAddedEvent,
+  EntityRemovedEvent,
 } from "./ecs/commands";
 export type { BundleConstructor, BundleOverrides } from "./ecs/commands";
 export type { EcsPlugin, EcsPluginGroup } from "./plugin";
@@ -37,7 +38,7 @@ import {
 } from "./ecs/types";
 import type { EcsPlugin, EcsPluginGroup } from "./plugin";
 import { Events } from "./ecs/events";
-import { EntityAddedEvent } from "./ecs/commands";
+import { EntityAddedEvent, EntityRemovedEvent, Commands } from "./ecs/commands";
 import { registerBuiltInSerializers } from "./ecs/serialization";
 
 export class App {
@@ -47,6 +48,7 @@ export class App {
   #pluginInstances: EcsPlugin[] = [];
   #resources: Map<string, unknown> = new Map();
   #events: Events;
+  #commands: Commands;
 
   static #serializersRegistered = false;
 
@@ -54,6 +56,7 @@ export class App {
     this.#world = new ECSWorld();
     this.#scheduler = new Scheduler();
     this.#events = new Events();
+    this.#commands = new Commands(this);
 
     // Auto-register built-in serializers on first App instance
     if (!App.#serializersRegistered) {
@@ -63,7 +66,7 @@ export class App {
   }
 
   public static create() {
-    return new App().addEvent(EntityAddedEvent);
+    return new App().addEvent(EntityAddedEvent).addEvent(EntityRemovedEvent);
   }
 
   public addSystems(
@@ -183,10 +186,17 @@ export class App {
         this.#scheduler.run(ESystemType.Update, this);
         this.#scheduler.run(ESystemType.PostUpdate, this);
 
+        // Flush despawns after PostUpdate
+        this.#commands.flushDespawns();
+
         while (accumulator >= targetFixedDelta) {
           this.#scheduler.run(ESystemType.PreFixedUpdate, this);
           this.#scheduler.run(ESystemType.FixedUpdate, this);
           this.#scheduler.run(ESystemType.PostFixedUpdate, this);
+
+          // Flush despawns after each fixed update cycle
+          this.#commands.flushDespawns();
+
           accumulator -= targetFixedDelta;
         }
 

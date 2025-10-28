@@ -2,7 +2,6 @@ import {
   App,
   EcsPlugin,
   Entity,
-  Events,
   Commands,
   UiPlugin,
   UiNode,
@@ -24,7 +23,6 @@ import {
   Shadow,
   Cursor,
   BoxBundle,
-  ButtonBundle,
   EventsApi,
 } from "@atlas/engine";
 
@@ -197,7 +195,7 @@ export class UiDemoPlugin implements EcsPlugin {
   private createButton(
     commands: Commands,
     label: string,
-    eventClass: new (entity: Entity) => any,
+    eventClass: new (entity: Entity) => unknown,
     baseColor: string,
     hoverColor: string,
     buttonType: string

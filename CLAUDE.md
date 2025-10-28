@@ -258,6 +258,240 @@ commands.spawnBundle(RequiredBundle, {
 - Bundle overrides use **arrays** as constructor arguments: `{ position: [x, y] }`
 - Both return an entity command with `.id()`, `.withParent()`, `.withChildren()` methods
 
+### Entity Despawning
+
+Atlas provides **deferred despawning** for update-loop safety. All despawn operations are queued and executed at safe boundaries between update phases.
+
+#### API Methods
+
+```typescript
+// Queue entity for destruction
+commands.despawnEntity(entity);
+
+// Queue entity and all descendants for destruction
+commands.despawnEntityRecursive(entity);
+
+// Entity command fluent API (equivalent)
+commands.entity(entity).despawn();
+commands.entity(entity).despawnRecursive();
+```
+
+#### Deferred Execution Model
+
+**All despawn operations are deferred** until the end of the current update phase. This prevents mid-iteration crashes:
+
+```typescript
+// Safe to despawn during iteration
+commands.query(Health).forEach((entity, health) => {
+  if (health.value <= 0) {
+    commands.despawnEntity(entity);  // Queued, not immediate
+  }
+  // Entity still exists here
+});
+
+// Despawn is flushed automatically after this system completes
+```
+
+**Flush Timing** (automatic):
+1. After `PostUpdate` phase
+2. After each `PostFixedUpdate` cycle
+3. Before `Render` phase
+
+#### Regular Despawn
+
+```typescript
+commands.despawnEntity(entity);
+```
+
+- Queues entity for destruction
+- Entity and all components removed
+- `EntityRemovedEvent` fires **before** destruction
+- **Does NOT update Parent/Children references**
+
+#### Recursive Despawn
+
+```typescript
+commands.despawnEntityRecursive(entity);
+```
+
+- Queues entity and all descendants for destruction
+- Walks hierarchy using `Children` components (breadth-first)
+- Despawns children before parents (bottom-up order)
+- **Does NOT update Parent/Children references** on non-despawned entities
+
+#### EntityRemovedEvent
+
+Subscribe to entity removal for cleanup:
+
+```typescript
+app.addEvent(EntityRemovedEvent);
+
+sys(({ commands, events }) => {
+  const reader = events.reader(EntityRemovedEvent);
+
+  for (const event of reader.read()) {
+    // Event fires BEFORE destruction - components still readable
+    const position = commands.tryGetComponent(event.entity, Position);
+    if (position) {
+      console.log("Entity removed at:", position.x, position.y);
+    }
+
+    // Clean up external resources (textures, audio, etc.)
+  }
+});
+```
+
+**Important**: `EntityRemovedEvent` fires **before** the entity is destroyed, allowing systems to read component data for cleanup purposes.
+
+#### Parent/Children Reference Behavior
+
+**Despawning does NOT clean up parent/children references:**
+
+```typescript
+// Setup
+const parent = commands.spawn(new Position()).id();
+const child1 = commands.spawn(new Position()).withParent(parent).id();
+const child2 = commands.spawn(new Position()).withParent(parent).id();
+
+commands.entity(parent).setChildren(child1, child2);
+
+// Despawn one child
+commands.despawnEntity(child2);
+
+// After flush:
+// - child2 is destroyed
+// - parent's Children component still has [child1, child2]  ← child2 is now invalid!
+// - Attempting to use child2 will return undefined or false
+```
+
+**Querying invalid entities:**
+
+```typescript
+const children = commands.getComponent(parent, Children);
+
+for (const childId of children.childrenIds) {
+  const position = commands.tryGetComponent(childId, Position);
+  if (!position) {
+    // Child was despawned - reference is invalid
+    continue;
+  }
+
+  // Use position...
+}
+```
+
+**Use recursive despawn for clean hierarchy removal:**
+
+```typescript
+// Despawns parent and all children together
+commands.despawnEntityRecursive(parent);
+```
+
+#### Common Patterns
+
+**Pattern 1: Cleanup on death**
+```typescript
+sys(({ commands }) => {
+  commands.query(Health).forEach((entity, health) => {
+    if (health.value <= 0) {
+      commands.despawnEntity(entity);
+    }
+  });
+});
+```
+
+**Pattern 2: Timed despawn**
+```typescript
+class Lifetime {
+  constructor(public duration: number) {}
+}
+
+sys(({ commands }) => {
+  const dt = commands.getResource(Time).deltaTime;
+
+  commands.query(Lifetime).forEach((entity, lifetime) => {
+    lifetime.duration -= dt;
+    if (lifetime.duration <= 0) {
+      commands.despawnEntity(entity);
+    }
+  });
+});
+```
+
+**Pattern 3: Cleanup with event listener**
+```typescript
+class PhysicsBody {
+  constructor(public handle: RigidBodyHandle) {}
+}
+
+sys(({ commands, events }) => {
+  const reader = events.reader(EntityRemovedEvent);
+  const physics = commands.getResource(PhysicsWorld);
+
+  for (const event of reader.read()) {
+    const body = commands.tryGetComponent(event.entity, PhysicsBody);
+    if (body) {
+      physics.removeRigidBody(body.handle);
+    }
+  }
+});
+```
+
+**Pattern 4: Recursive hierarchy despawn**
+```typescript
+// Despawn UI menu and all child elements
+commands.entity(menuRoot).despawnRecursive();
+
+// Despawn particle system and all particles
+commands.entity(particleSystem).despawnRecursive();
+```
+
+#### Best Practices
+
+1. **Use deferred despawning during iteration** - Never try to despawn immediately
+2. **Subscribe to EntityRemovedEvent for cleanup** - Release external resources (GPU, audio)
+3. **Use tryGetComponent with hierarchies** - Check for invalid entity references
+4. **Prefer recursive despawn for hierarchies** - Cleaner than manual traversal
+5. **Don't store entity IDs long-term** - They may become invalid after despawn
+
+#### Anti-Patterns
+
+**❌ Don't: Try to access despawned entities**
+```typescript
+// BAD
+commands.despawnEntity(enemy);
+const position = commands.getComponent(enemy, Position);  // Still queued, works now
+// After flush: entity is gone, would throw error
+```
+
+**✅ Do: Check existence before access**
+```typescript
+// GOOD
+const position = commands.tryGetComponent(enemy, Position);
+if (position) {
+  // Entity exists
+}
+```
+
+**❌ Don't: Manually update Parent/Children on despawn**
+```typescript
+// BAD - Unnecessary and error-prone
+const parent = commands.getComponent(child, Parent);
+const children = commands.getComponent(parent.parentId, Children);
+children.childrenIds = children.childrenIds.filter(id => id !== child);
+commands.despawnEntity(child);
+```
+
+**✅ Do: Use recursive despawn or accept invalid references**
+```typescript
+// GOOD - Recursive despawn handles hierarchy
+commands.despawnEntityRecursive(parent);
+
+// GOOD - Or just despawn and check validity when querying
+commands.despawnEntity(child);
+// Parent's children array may have invalid IDs - check with tryGetComponent
+```
+
 ### Serialization System
 
 The new serialization system (see `packages/core/src/ecs/serialization`) enables:

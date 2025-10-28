@@ -155,6 +155,18 @@ function entityCommand(entity: Entity, commands: Commands) {
         children.childrenIds = childrenIds;
       }
     },
+    removeChildren: (...childrenIds: Entity[]) => {
+      const children = commands.tryGetComponent(entity, Children);
+      if (!children) return;
+      children.childrenIds = children.childrenIds.filter(
+        (id) => !childrenIds.includes(id)
+      );
+      if (children.childrenIds.length === 0) {
+        commands.removeComponent(entity, Children);
+      }
+
+      return entityCommand(entity, commands);
+    },
     setParent: (parentId: Entity | undefined | null) => {
       if (!parentId) {
         commands.removeComponent(entity, Parent);
@@ -174,6 +186,14 @@ function entityCommand(entity: Entity, commands: Commands) {
       return commands.getComponent(entity, componentClass);
     },
     id: () => {
+      return entity;
+    },
+    despawn: () => {
+      commands.despawnEntity(entity);
+      return entity;
+    },
+    despawnRecursive: () => {
+      commands.despawnEntityRecursive(entity);
       return entity;
     },
   };
@@ -202,9 +222,15 @@ export class EntityAddedEvent {
   constructor(public entity: Entity) {}
 }
 
+export class EntityRemovedEvent {
+  constructor(public entity: Entity) {}
+}
+
 export class Commands {
   #world: World;
   #app: import("../index").App;
+  #deferredDespawns: Set<Entity> = new Set();
+  #deferredRecursiveDespawns: Set<Entity> = new Set();
 
   constructor(app: import("../index").App) {
     this.#world = app.world;
@@ -738,6 +764,94 @@ export class Commands {
     }
     const withComponents = args as readonly ComponentClass<unknown>[];
     return new QueryBuilder<any>(this.#world, ...(withComponents as any));
+  }
+
+  /**
+   * Queues an entity for despawning. The entity will be destroyed at the end of the current update phase.
+   * This method is update-loop safe - you can call it while iterating over queries.
+   *
+   * Note: This does NOT remove references from Parent/Children components. If you despawn a child,
+   * the parent's Children component will still reference it (creating an invalid entity reference).
+   *
+   * @param entity The entity to despawn
+   */
+  public despawnEntity(entity: Entity): void {
+    this.#deferredDespawns.add(entity);
+  }
+
+  /**
+   * Queues an entity and all its descendants for despawning. The entities will be destroyed at the
+   * end of the current update phase. This method is update-loop safe.
+   *
+   * This recursively walks the entity hierarchy using Children components and despawns all descendants.
+   * Children are despawned before their parent (bottom-up order).
+   *
+   * Note: This does NOT remove references from Parent/Children components of non-despawned entities.
+   *
+   * @param entity The root entity to despawn (along with all its children)
+   */
+  public despawnEntityRecursive(entity: Entity): void {
+    this.#deferredRecursiveDespawns.add(entity);
+  }
+
+  /**
+   * Executes all queued despawn operations. This is called automatically by the App at the end
+   * of each update phase. You should not need to call this manually.
+   * @internal
+   */
+  public flushDespawns(): void {
+    // Process recursive despawns first
+    for (const entity of this.#deferredRecursiveDespawns) {
+      this.#despawnRecursiveImmediate(entity);
+    }
+    this.#deferredRecursiveDespawns.clear();
+
+    // Process regular despawns
+    for (const entity of this.#deferredDespawns) {
+      this.#despawnImmediate(entity);
+    }
+    this.#deferredDespawns.clear();
+  }
+
+  /**
+   * Immediately despawns an entity. Fires EntityRemovedEvent before destruction.
+   * @private
+   */
+  #despawnImmediate(entity: Entity): void {
+    // Fire event BEFORE destruction so systems can still query components
+    const event = new EntityRemovedEvent(entity);
+    this.#app.events.writer(EntityRemovedEvent).send(event);
+
+    // Destroy entity and all its components
+    this.#world.destroyEntity(entity);
+  }
+
+  /**
+   * Immediately despawns an entity and all its descendants recursively.
+   * Uses iterative traversal with visited set to handle cycles gracefully.
+   * @private
+   */
+  #despawnRecursiveImmediate(entity: Entity): void {
+    // Collect all entities in the hierarchy (breadth-first)
+    const toDestroy: Entity[] = [entity];
+    const visited = new Set<Entity>();
+
+    let i = 0;
+    while (i < toDestroy.length) {
+      const current = toDestroy[i++];
+      if (visited.has(current)) continue;
+      visited.add(current);
+
+      const children = this.tryGetComponent(current, Children);
+      if (children) {
+        toDestroy.push(...children.childrenIds);
+      }
+    }
+
+    // Despawn in reverse order (children first, then parents)
+    for (let j = toDestroy.length - 1; j >= 0; j--) {
+      this.#despawnImmediate(toDestroy[j]!);
+    }
   }
 }
 
