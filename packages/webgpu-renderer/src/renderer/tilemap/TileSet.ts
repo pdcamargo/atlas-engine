@@ -384,6 +384,27 @@ export class TileSet {
           config.metadata = Object.keys(cleanMetadata).length > 0 ? cleanMetadata : undefined;
         }
 
+        // Check if this was created from Tiled (has _tiledFrameData metadata)
+        const tiledFrameData = config.metadata?._tiledFrameData;
+        if (tiledFrameData) {
+          // Recreate frames from pixel data with proper texture dimensions
+          const frames: TileAnimationFrame[] = tiledFrameData.map((frameData: any) => {
+            return TileAnimationFrame.fromPixels(
+              frameData.x,
+              frameData.y,
+              frameData.width,
+              frameData.height,
+              texture.width,
+              texture.height,
+              frameData.duration
+            );
+          });
+          // Remove _tiledFrameData from metadata
+          const { _tiledFrameData, ...cleanMetadata } = config.metadata || {};
+          config.frames = frames;
+          config.metadata = Object.keys(cleanMetadata).length > 0 ? cleanMetadata : undefined;
+        }
+
         // Create the animated tile
         const animatedTile = new AnimatedTile(config);
         this.tiles.set(config.id, animatedTile);

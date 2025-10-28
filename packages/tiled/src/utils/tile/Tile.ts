@@ -1,5 +1,5 @@
-import { TiledObjectGroup } from "../../layer/ObjectGroup";
-import { TiledAnyProperty } from "../../property/AnyProperty";
+import { TiledObjectGroup } from "../layer/ObjectGroup";
+import { TiledAnyProperty } from "../property/AnyProperty";
 import { TiledFrame } from "./Frame";
 
 /** Tile definition. */

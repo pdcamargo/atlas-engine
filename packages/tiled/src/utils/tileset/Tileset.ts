@@ -1,9 +1,9 @@
-import { TiledColor } from "../../common/Color";
-import { TiledPoint } from "../../common/Point";
-import { TiledGrid } from "../../grid/Grid";
-import { TiledAnyProperty } from "../../property/AnyProperty";
-import { TiledTile } from "../../tile/Tile";
-import { TiledWangSet } from "../../wangset/WangSet";
+import { TiledColor } from "../common/Color";
+import { TiledPoint } from "../common/Point";
+import { TiledGrid } from "../grid/Grid";
+import { TiledAnyProperty } from "../property/AnyProperty";
+import { TiledTile } from "../tile/Tile";
+import { TiledWangSet } from "../wangset/WangSet";
 import { TiledFillMode } from "./FillMode";
 import { TiledObjectAlignment } from "./ObjectAlignment";
 import { TiledTileRenderSize } from "./TileRenderSize";

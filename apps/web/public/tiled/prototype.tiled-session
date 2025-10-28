@@ -8,6 +8,7 @@
     ],
     "fileStates": {
     },
+    "frame.defaultDuration": 110,
     "last.imagePath": "//wsl.localhost/Ubuntu/home/pdcamargo/dev/atlas/apps/web/public/tiled",
     "map.lastUsedFormat": "json",
     "map.tileHeight": 16,

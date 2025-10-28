@@ -187,17 +187,29 @@ function loadTiledMap(
     if (tileset.tiles) {
       for (const tile of tileset.tiles) {
         if (tile.animation && tile.animation.length > 0) {
-          // Create animated tile
-          const frames = tile.animation.map((frame: TiledFrame) => ({
-            frame: tileSet.getTile(frame.tileid)?.frame || new Rect(0, 0, 1, 1),
-            duration: frame.duration,
-          }));
+          // Store frame data for deferred creation
+          const frameData = tile.animation.map((frame: TiledFrame) => {
+            // Calculate tile position in the grid
+            const tileId = frame.tileid;
+            const col = tileId % tileset.columns;
+            const row = Math.floor(tileId / tileset.columns);
 
+            // Calculate pixel coordinates with margin and spacing
+            const x = tileset.margin + col * (tileset.tilewidth + tileset.spacing);
+            const y = tileset.margin + row * (tileset.tileheight + tileset.spacing);
+
+            return { x, y, width: tileset.tilewidth, height: tileset.tileheight, duration: frame.duration };
+          });
+
+          // Store pixel data in metadata for deferred normalization
           tileSet.addAnimatedTile({
             id: tile.id,
-            frames,
+            frames: [], // Will be filled when texture loads
             loop: true,
             speed: 1.0,
+            metadata: {
+              _tiledFrameData: frameData
+            }
           });
         }
       }
