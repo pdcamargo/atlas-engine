@@ -26,7 +26,6 @@ import {
   ChromaticAberrationEffect,
   BloomEffect,
   ParticlePresets,
-  PointLight,
   PixelsPerUnit,
 } from "@atlas/engine";
 
@@ -192,7 +191,7 @@ export class SlayGamePlugin implements EcsPlugin {
           texture: textureHandle3,
         });
 
-        for (let i = 0; i < 256; i++) {
+        for (let i = 0; i < 512; i++) {
           // Character sprites are 64x64 pixels (8 frames × 64px in 512px texture)
           const animatedSprite = new AnimatedSprite(null, 64, 64);
 
@@ -245,8 +244,6 @@ export class SlayGamePlugin implements EcsPlugin {
           // With Y range of -2.5 to 2.5, Z will range from -50.25 to -49.75
 
           animatedSprite.setPosition(pos);
-
-          commands.spawn(PointLight.torch(pos.x, pos.y, 1));
 
           // commands.spawn(
           //   new PointLight(

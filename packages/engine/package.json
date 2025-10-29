@@ -23,6 +23,7 @@
     "@atlas/animator": "workspace:*",
     "@atlas/ui": "workspace:*",
     "@atlas/tiled": "workspace:*",
+    "@atlas/physics": "workspace:*",
     "reflect-metadata": "^0.2.2"
   }
 }

@@ -200,6 +200,10 @@ function entityCommand(entity: Entity, commands: Commands) {
       commands.despawnEntityRecursive(entity);
       return entity;
     },
+    insert: (...components: unknown[]) => {
+      commands.addComponents(entity, ...components);
+      return entityCommand(entity, commands);
+    },
   };
 }
 

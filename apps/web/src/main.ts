@@ -9,8 +9,9 @@ import { SlayGamePlugin } from "./games/slay";
 import { SerializationDemoPlugin } from "./games/serialization-demo/serialization-demo";
 import { TiledGamePlugin } from "./games/tiled";
 import { ObserverDemoPlugin } from "./games/observer-demo";
+import { GpuPhysicsDemoPlugin } from "./games/gpu-physics-demo/gpu-physics-demo";
 
-const GAME = "tiled";
+const GAME = "gpu-physics-demo";
 
 async function main() {
   const gamePlugins: Record<string, () => EcsPlugin> = {
@@ -22,6 +23,7 @@ async function main() {
     "serialization-demo": () => new SerializationDemoPlugin(),
     tiled: () => new TiledGamePlugin(),
     "observer-demo": () => new ObserverDemoPlugin(),
+    "gpu-physics-demo": () => new GpuPhysicsDemoPlugin(),
   };
 
   const gamePlugin = (gamePlugins[GAME] ?? gamePlugins["slay"])();

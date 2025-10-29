@@ -110,9 +110,6 @@ importers:
 
   packages/core:
     dependencies:
-      '@dimforge/rapier2d':
-        specifier: ^0.19.0
-        version: 0.19.0
       gl-matrix:
         specifier: 4.0.0-beta.2
         version: 4.0.0-beta.2
@@ -156,6 +153,9 @@ importers:
       '@atlas/core':
         specifier: workspace:*
         version: link:../core
+      '@atlas/physics':
+        specifier: workspace:*
+        version: link:../physics
       '@atlas/tiled':
         specifier: workspace:*
         version: link:../tiled
@@ -199,6 +199,34 @@ importers:
       eslint-config-prettier:
         specifier: ^9.1.0
         version: 9.1.2(eslint@8.57.1)
+
+  packages/physics:
+    dependencies:
+      '@atlas/core':
+        specifier: workspace:*
+        version: link:../core
+      '@atlas/webgpu-renderer':
+        specifier: workspace:*
+        version: link:../webgpu-renderer
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+    devDependencies:
+      '@repo/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@repo/utils':
+        specifier: workspace:*
+        version: link:../utils
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      typescript:
+        specifier: 5.5.4
+        version: 5.5.4
 
   packages/template:
     dependencies:
@@ -372,9 +400,6 @@ packages:
   '@babel/types@7.28.5':
     resolution: {integrity: sha512-qQ5m48eI/MFLQ5PxQj4PFaprjyCTLI37ElWMmNs0K8Lk3dVeOdNpB3ks8jc7yM5CDmVC73eMVk/trk3fgmrUpA==}
     engines: {node: '>=6.9.0'}
-
-  '@dimforge/rapier2d@0.19.0':
-    resolution: {integrity: sha512-ZYYrPyv4acUZiZxN3bqMKPDAJqafMyBGZovUvZkAwqGEQ0I+8rtRc8BX+n3x84deuOe3OSQQtUDi8YFXa8CRIQ==}
 
   '@emnapi/core@1.6.0':
     resolution: {integrity: sha512-zq/ay+9fNIJJtJiZxdTnXS20PllcYMX3OE23ESc4HK/bdYu3cOWYVhsOhVnXALfU/uqJIxn5NBPd9z4v+SfoSg==}
@@ -1774,8 +1799,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
-
-  '@dimforge/rapier2d@0.19.0': {}
 
   '@emnapi/core@1.6.0':
     dependencies:
