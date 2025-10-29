@@ -2,6 +2,10 @@ import { Children, Parent } from "./components";
 import { Scene, SceneInstance } from "./scene/scene";
 import type { ComponentClass, Entity } from "./types";
 import type { World } from "./world";
+import type { EventClass } from "./events";
+import type { ObserverCallback } from "./observer/types";
+import { ObserverRegistry } from "./observer/registry";
+import { ObserverTrigger } from "./observer/trigger";
 
 export type BundleConstructor<S> = {
   new (): never;
@@ -214,6 +218,10 @@ function spawnEntityCommand(entity: Entity, commands: Commands) {
       commands.addComponents(entity, ...components);
 
       return entityCommand(entity, commands);
+    },
+    observe: <T>(eventClass: EventClass<T>, callback: ObserverCallback<T>) => {
+      commands.observe(entity, eventClass, callback);
+      return spawnEntityCommand(entity, commands);
     },
   };
 }
@@ -811,6 +819,51 @@ export class Commands {
       this.#despawnImmediate(entity);
     }
     this.#deferredDespawns.clear();
+  }
+
+  /**
+   * Trigger an event that will invoke all registered observers.
+   * The event is queued and will be processed at the next observer flush boundary.
+   *
+   * @param event The event instance to trigger
+   * @param entity Optional target entity (for entity-targeted events)
+   *
+   * @example
+   * ```ts
+   * // Broadcast event (no specific entity)
+   * commands.trigger(new ExplodeMines({ pos, radius }));
+   *
+   * // Entity-targeted event
+   * commands.trigger(new Explode(), mineEntity);
+   * ```
+   */
+  public trigger<T>(event: T, entity?: Entity): void {
+    const trigger = this.#app.getResource(ObserverTrigger);
+    trigger.trigger(event, entity);
+  }
+
+  /**
+   * Register an entity-scoped observer.
+   * The observer will only fire when the event targets this specific entity.
+   *
+   * @param entity The entity to observe events for
+   * @param eventClass The event class to observe
+   * @param callback The callback to execute when the event is triggered
+   *
+   * @example
+   * ```ts
+   * commands.observe(mineEntity, Explode, (trigger, commands) => {
+   *   console.log("This mine exploded!");
+   * });
+   * ```
+   */
+  public observe<T>(
+    entity: Entity,
+    eventClass: EventClass<T>,
+    callback: ObserverCallback<T>
+  ): void {
+    const registry = this.#app.getResource(ObserverRegistry);
+    registry.register({ eventClass, callback, targetEntity: entity });
   }
 
   /**

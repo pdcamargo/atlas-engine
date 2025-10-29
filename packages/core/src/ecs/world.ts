@@ -3,11 +3,23 @@ import type { ComponentClass, Entity } from "./types";
 import type { Scene, SceneInstance } from "./scene/scene";
 import { SceneSerializer } from "./scene/scene-serializer";
 import { SceneSpawner } from "./scene/spawner";
+import { ComponentAdded, ComponentRemoved } from "./observer";
+import type { ObserverTrigger } from "./observer/trigger";
 
 export class World {
   #nextEntityId: Entity = 1;
   #archetypeByKey: Map<string, Archetype> = new Map();
   #archetypeByEntity: Map<Entity, Archetype> = new Map();
+  #observerTrigger?: ObserverTrigger;
+
+  /**
+   * Set the observer trigger for firing component lifecycle events.
+   * This is called by the App during initialization.
+   * @internal
+   */
+  public setObserverTrigger(trigger: ObserverTrigger): void {
+    this.#observerTrigger = trigger;
+  }
 
   public createEntity(): Entity {
     const id = this.#nextEntityId++;
@@ -27,18 +39,42 @@ export class World {
             .constructor as ComponentClass<unknown>
       );
       this.#moveEntityToArchetype(entity, componentClasses, components);
+
+      // Fire component lifecycle observers for new components
+      if (this.#observerTrigger) {
+        for (const value of Object.values(components)) {
+          if (!value) continue;
+          const cls = (value as any).constructor as ComponentClass<unknown>;
+          // Trigger with component instance as the event, using class as key
+          console.log("[World] Triggering component added:", cls.name, "for entity:", entity);
+          this.#observerTrigger.triggerComponent(cls, "onAdded", value, entity);
+        }
+      }
       return;
     }
 
-    // Merge existing components with the new ones (new ones override same-class ones)
+    // Track which components are newly added (not overrides)
     const existing = currentArchetype.getEntityComponents(entity) ?? new Map();
+    const newComponents: Array<{ cls: ComponentClass<unknown>; value: unknown }> = [];
+
     const mergedInstances = new Map<ComponentClass<unknown>, unknown>(existing);
     for (const value of Object.values(components)) {
       if (!value) continue;
       const cls = (value as any).constructor as ComponentClass<unknown>;
+      const isNew = !mergedInstances.has(cls);
       mergedInstances.set(cls, value);
+      if (isNew) {
+        newComponents.push({ cls, value });
+      }
     }
     this.setComponentsFromInstances(entity, mergedInstances);
+
+    // Fire component lifecycle observers only for newly added components
+    if (this.#observerTrigger && newComponents.length > 0) {
+      for (const { cls, value } of newComponents) {
+        this.#observerTrigger.triggerComponent(cls, "onAdded", value, entity);
+      }
+    }
   }
 
   public setComponentsFromInstances(
@@ -220,8 +256,16 @@ export class World {
     const currentComponents = currentArchetype.getEntityComponents(entity);
     if (!currentComponents) return false;
 
+    // Get the component instance before removal (for the event)
+    const removedComponent = currentComponents.get(componentClass);
+
     // Remove the specified component
     currentComponents.delete(componentClass);
+
+    // Fire component lifecycle observers
+    if (this.#observerTrigger && removedComponent !== undefined) {
+      this.#observerTrigger.triggerComponent(componentClass, "onRemoved", removedComponent, entity);
+    }
 
     // If no components left, remove entity entirely
     if (currentComponents.size === 0) {

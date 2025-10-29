@@ -209,6 +209,115 @@ Event system provides decoupled communication:
 - Read events in systems: `events.read(MyEvent).forEach(event => {...})`
 - Events are cleared at frame end
 
+### Observer System
+
+The Observer System provides reactive, event-driven programming for the ECS (inspired by Bevy). Observers are callbacks that automatically fire when events are triggered.
+
+**Key Features:**
+- Component lifecycle observers (`ComponentAdded`, `ComponentRemoved`)
+- Custom event observers (any event type)
+- Entity-scoped observers (only fire for specific entities)
+- Deferred execution (flush at safe boundaries)
+- Type-safe with full TypeScript inference
+
+**Core API:**
+
+```typescript
+// Register global observer
+app.addObserver(EventClass, (trigger, commands) => {
+  const event = trigger.event();      // Get event instance
+  const entity = trigger.entity();    // Get target entity (0 for broadcast)
+  // React to event
+});
+
+// Trigger events from systems
+commands.trigger(new MyEvent());              // Broadcast
+commands.trigger(new MyEvent(), entity);      // Entity-targeted
+
+// Entity-scoped observers (only fire for this entity)
+commands.spawn(new Mine())
+  .observe(Explode, (trigger, commands) => {
+    // Only fires when THIS entity receives Explode event
+  });
+```
+
+**Component Lifecycle Observers:**
+
+```typescript
+// React when Mine component is added to any entity
+app.addObserver(ComponentAdded, (trigger: Trigger<ComponentAdded<Mine>>, commands) => {
+  const event = trigger.event();
+  if (!(event.component instanceof Mine)) return;
+
+  const mine = event.component;
+  const index = commands.getResource(SpatialIndex);
+  index.add(event.entity, mine.pos);
+});
+
+// React when Mine component is removed
+app.addObserver(ComponentRemoved, (trigger: Trigger<ComponentRemoved<Mine>>, commands) => {
+  const event = trigger.event();
+  if (!(event.component instanceof Mine)) return;
+
+  const mine = event.component;
+  const index = commands.getResource(SpatialIndex);
+  index.remove(event.entity, mine.pos);
+});
+```
+
+**Observer Execution Timing:**
+
+Observers flush at these boundaries:
+1. After `PostUpdate` phase
+2. After each `PostFixedUpdate` cycle
+
+Execution order:
+```
+Update → PostUpdate → [Flush Observers] → [Flush Despawns] → Fixed Update Loop
+```
+
+**Comparison with Events:**
+- **Events**: Polled by systems using readers (pull model)
+- **Observers**: Execute automatically when triggered (push model)
+
+Use observers for reactive logic that responds to specific events, use events for systems that need to poll for changes each frame.
+
+**Example: Mine Explosion Cascade**
+
+```typescript
+class Explode {}
+class ExplodeMines { constructor(public pos: vec2, public radius: number) {} }
+
+await App.create()
+  // Component added observer (spatial index)
+  .addObserver(ComponentAdded, (trigger, commands) => {
+    const event = trigger.event();
+    if (!(event.component instanceof Mine)) return;
+    commands.getResource(SpatialIndex).add(event.entity, event.component.pos);
+  })
+
+  // Explode observer (despawn and cascade)
+  .addObserver(Explode, (trigger, commands) => {
+    const entity = trigger.entity();
+    const mine = commands.tryGetComponent(entity, Mine);
+    if (!mine) return;
+
+    commands.despawnEntity(entity);
+    commands.trigger(new ExplodeMines({ pos: mine.pos, radius: mine.size }));
+  })
+
+  // ExplodeMines observer (find nearby and trigger)
+  .addObserver(ExplodeMines, (trigger, commands) => {
+    const event = trigger.event();
+    const index = commands.getResource(SpatialIndex);
+
+    for (const nearby of index.getNearby(event.pos, event.radius)) {
+      commands.trigger(new Explode(), nearby);
+    }
+  })
+  .run();
+```
+
 ### Entity Spawning
 
 **Spawning with components directly:**

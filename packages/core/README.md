@@ -33,6 +33,13 @@ The core ECS (Entity-Component-System) package for Atlas Engine, providing the f
   - [Event Writers](#event-writers)
   - [Event Readers](#event-readers)
   - [Built-in Events](#built-in-events)
+- [Observers](#observers)
+  - [Observer System](#observer-system)
+  - [Registering Observers](#registering-observers)
+  - [Component Lifecycle Observers](#component-lifecycle-observers)
+  - [Entity-Scoped Observers](#entity-scoped-observers)
+  - [Custom Event Observers](#custom-event-observers)
+  - [Observer Execution](#observer-execution)
 - [Hierarchy](#hierarchy)
   - [Parent/Children Components](#parentchildren-components)
 - [Serialization](#serialization)
@@ -715,6 +722,347 @@ sys(({ commands, events }) => {
 ```
 
 **Important**: `EntityRemovedEvent` fires before destruction, allowing systems to read component data for cleanup purposes.
+
+---
+
+## Observers
+
+### Observer System
+
+The **Observer System** provides reactive programming capabilities for the ECS, inspired by Bevy's observer pattern. Observers are callbacks that automatically fire in response to triggered events—perfect for game logic that reacts to specific occurrences like explosions, component changes, or custom game events.
+
+**Key Features**:
+- **Component lifecycle observers**: React to component add/remove events
+- **Custom event observers**: Trigger observers with any event type
+- **Entity-scoped observers**: Observers that only fire for specific entities
+- **Deferred execution**: Observers flush at safe boundaries (like despawning)
+- **Type-safe**: Full TypeScript type inference for event payloads
+
+**Comparison with Events**:
+- **Events**: Polled by systems using readers (pull model)
+- **Observers**: Execute automatically when triggered (push model)
+
+Use observers when you want reactive, event-driven logic without polling every frame.
+
+### Registering Observers
+
+Observers are registered at the app level using `app.addObserver()`:
+
+```typescript
+import { App, Trigger, Commands } from "@atlas/core";
+
+class Explode {
+  constructor(public entity: Entity) {}
+}
+
+// Register observer for Explode events
+await App.create()
+  .addObserver(Explode, (trigger: Trigger<Explode>, commands: Commands) => {
+    const entity = trigger.entity();
+    const event = trigger.event();
+
+    console.log("Entity exploded:", entity);
+    commands.despawnEntity(entity);
+  })
+  .run();
+```
+
+**Observer Signature**:
+```typescript
+type ObserverCallback<TEvent> = (
+  trigger: Trigger<TEvent>,
+  commands: Commands
+) => void;
+```
+
+**Trigger API**:
+```typescript
+class Trigger<TEvent> {
+  event(): TEvent          // Get the event instance
+  entity(): Entity         // Get target entity (0 for broadcast events)
+  hasEntity(): boolean     // Check if event targets a specific entity
+}
+```
+
+### Component Lifecycle Observers
+
+Observers can react to components being added or removed from entities. This is useful for initializing state, updating spatial indexes, or cleanup.
+
+#### ComponentAdded Observer
+
+```typescript
+import { ComponentAdded, Trigger } from "@atlas/core";
+
+class Mine {
+  constructor(
+    public pos: vec2,
+    public size: number
+  ) {}
+}
+
+// React when Mine component is added to any entity
+app.addObserver(ComponentAdded, (trigger: Trigger<ComponentAdded<Mine>>, commands) => {
+  const event = trigger.event();
+  const entity = event.entity;
+  const mine = event.component as Mine;
+
+  // Add mine to spatial index
+  const index = commands.getResource(SpatialIndex);
+  index.add(entity, mine.pos);
+});
+```
+
+**ComponentAdded Event**:
+```typescript
+class ComponentAdded<T> {
+  entity: Entity;                // Entity that received the component
+  component: T;                  // The component instance that was added
+  componentClass: ComponentClass<T>;  // Component class reference
+}
+```
+
+#### ComponentRemoved Observer
+
+```typescript
+// React when Mine component is removed from any entity
+app.addObserver(ComponentRemoved, (trigger: Trigger<ComponentRemoved<Mine>>, commands) => {
+  const event = trigger.event();
+  const entity = event.entity;
+  const mine = event.component as Mine;
+
+  // Remove mine from spatial index
+  const index = commands.getResource(SpatialIndex);
+  index.remove(entity, mine.pos);
+});
+```
+
+**ComponentRemoved Event**:
+```typescript
+class ComponentRemoved<T> {
+  entity: Entity;                // Entity that lost the component
+  component: T;                  // The component instance that was removed
+  componentClass: ComponentClass<T>;  // Component class reference
+}
+```
+
+**Important Notes**:
+- Component events are triggered automatically by `World.addComponents()` and `World.removeComponent()`
+- Events are deferred—observers fire during the next observer flush
+- Component lifecycle observers are global by default (react to all entities)
+- Use entity-scoped observers (see below) to watch specific entities
+
+### Entity-Scoped Observers
+
+Register observers that only fire for specific entities using `.observe()` during entity spawning:
+
+```typescript
+class Explode {
+  constructor() {}
+}
+
+// Spawn a mine with entity-scoped observer
+const mine = commands.spawn(
+  new Mine(pos, size)
+)
+.observe(Explode, (trigger, commands) => {
+  // This observer ONLY fires when THIS specific mine explodes
+  const entity = trigger.entity();
+  console.log("This mine exploded:", entity);
+
+  // Trigger cascade explosion
+  commands.trigger(new ExplodeMines({ pos: mine.pos, radius: mine.size }));
+})
+.id();
+```
+
+**When to use entity-scoped observers**:
+- Entity-specific reactions (e.g., "this mine explodes")
+- Behavior tied to individual entities (e.g., death animations)
+- Avoiding global queries (better performance for targeted reactions)
+
+**When to use global observers**:
+- Reactions that apply to all entities of a type
+- Centralized logic (e.g., updating a spatial index)
+- Component lifecycle tracking
+
+### Custom Event Observers
+
+Trigger observers from systems using `commands.trigger()`:
+
+```typescript
+// Define custom event
+class ExplodeMines {
+  constructor(
+    public pos: vec2,
+    public radius: number
+  ) {}
+}
+
+// Register observer
+app.addObserver(ExplodeMines, (trigger, commands) => {
+  const event = trigger.event();
+  const index = commands.getResource(SpatialIndex);
+
+  // Find nearby mines
+  for (const entity of index.getNearby(event.pos, event.radius)) {
+    // Trigger explosion on each mine
+    commands.trigger(new Explode(), entity);
+  }
+});
+
+// Trigger from system
+sys(({ commands }) => {
+  // Trigger broadcast event (no specific entity)
+  commands.trigger(new ExplodeMines({ pos, radius: 50 }));
+
+  // Trigger entity-targeted event
+  commands.trigger(new Explode(), mineEntity);
+});
+```
+
+**Broadcast vs Entity-Targeted Events**:
+
+```typescript
+// Broadcast event (no target entity)
+commands.trigger(new GameOver({ score: 1000 }));
+
+// Entity-targeted event
+commands.trigger(new TakeDamage({ amount: 10 }), playerEntity);
+```
+
+- **Broadcast events**: Fire all global observers, skip entity-scoped observers
+- **Entity-targeted events**: Fire global observers + entity-scoped observers for that entity
+
+### Observer Execution
+
+Observers use **deferred execution** (like despawning) for loop safety and predictable timing.
+
+**Execution Flow**:
+```
+1. System calls commands.trigger(event)
+2. Event is queued in ObserverTrigger
+3. System continues executing
+4. At flush boundary, all observers execute
+5. Queue is cleared
+```
+
+**Flush Boundaries**:
+- After `PostUpdate` phase
+- After each `PostFixedUpdate` cycle
+
+**Execution Order**:
+```
+┌─ PreUpdate
+├─ Update
+├─ PostUpdate
+│   ├─ [Flush Observers]    ← Observers execute here
+│   └─ [Flush Despawns]
+│
+├─ Fixed Update Loop
+│   ├─ PreFixedUpdate
+│   ├─ FixedUpdate
+│   ├─ PostFixedUpdate
+│   │   ├─ [Flush Observers]    ← Observers execute here
+│   │   └─ [Flush Despawns]
+│
+├─ PreRender
+├─ Render
+├─ PostRender
+```
+
+**Complete Example: Mine Explosion Cascade**
+
+```typescript
+import { App, sys, Trigger, Commands, ComponentAdded } from "@atlas/core";
+
+class Mine {
+  constructor(public pos: vec2, public size: number) {}
+}
+
+class Explode {}
+
+class ExplodeMines {
+  constructor(public pos: vec2, public radius: number) {}
+}
+
+class SpatialIndex {
+  private index: Map<string, Set<Entity>> = new Map();
+
+  add(entity: Entity, pos: vec2) { /* ... */ }
+  remove(entity: Entity, pos: vec2) { /* ... */ }
+  getNearby(pos: vec2, radius: number): Entity[] { /* ... */ }
+}
+
+await App.create()
+  // Register spatial index resource
+  .addStartupSystems(({ commands }) => {
+    commands.setResource(new SpatialIndex());
+  })
+
+  // Add mine to index when Mine component added
+  .addObserver(ComponentAdded, (trigger: Trigger<ComponentAdded<Mine>>, commands) => {
+    const event = trigger.event();
+    if (!(event.component instanceof Mine)) return;
+
+    const mine = event.component;
+    const index = commands.getResource(SpatialIndex);
+    index.add(event.entity, mine.pos);
+  })
+
+  // Remove mine from index when Mine component removed
+  .addObserver(ComponentRemoved, (trigger: Trigger<ComponentRemoved<Mine>>, commands) => {
+    const event = trigger.event();
+    if (!(event.component instanceof Mine)) return;
+
+    const mine = event.component;
+    const index = commands.getResource(SpatialIndex);
+    index.remove(event.entity, mine.pos);
+  })
+
+  // ExplodeMines: find nearby mines and trigger their explosions
+  .addObserver(ExplodeMines, (trigger, commands) => {
+    const event = trigger.event();
+    const index = commands.getResource(SpatialIndex);
+
+    for (const entity of index.getNearby(event.pos, event.radius)) {
+      const mine = commands.tryGetComponent(entity, Mine);
+      if (mine && distance(mine.pos, event.pos) < mine.size + event.radius) {
+        commands.trigger(new Explode(), entity);
+      }
+    }
+  })
+
+  // Explode: despawn mine and trigger cascade
+  .addObserver(Explode, (trigger, commands) => {
+    const entity = trigger.entity();
+    const mine = commands.tryGetComponent(entity, Mine);
+    if (!mine) return;
+
+    console.log("Mine exploded:", entity);
+    commands.despawnEntity(entity);
+
+    // Trigger cascade explosion
+    commands.trigger(new ExplodeMines({ pos: mine.pos, radius: mine.size }));
+  })
+
+  // System: handle mouse clicks to explode mines
+  .addUpdateSystems(sys(({ commands }) => {
+    const input = commands.getResource(Input);
+    if (input.isMouseButtonJustPressed(MouseButton.Left)) {
+      const mousePos = input.getMousePosition();
+      commands.trigger(new ExplodeMines({ pos: mousePos, radius: 10 }));
+    }
+  }))
+
+  .run();
+```
+
+**Key Patterns**:
+
+1. **Spatial Index Pattern**: Use `ComponentAdded`/`ComponentRemoved` for automatic index updates
+2. **Cascade Events**: Observers can trigger more events (e.g., explosion chains)
+3. **Entity-Scoped Cleanup**: Attach observers to entities for automatic cleanup
+4. **Reactive Logic**: Let observers handle reactions instead of polling in systems
 
 ---
 

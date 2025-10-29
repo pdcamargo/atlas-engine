@@ -29,6 +29,9 @@ export * from "./ecs/serialization";
 // Scene system
 export * from "./ecs/scene";
 
+// Observer system
+export * from "./ecs/observer";
+
 import { Scheduler } from "./ecs/scheduler";
 import { World as ECSWorld } from "./ecs/world";
 import {
@@ -37,9 +40,16 @@ import {
   type SystemDescriptor,
 } from "./ecs/types";
 import type { EcsPlugin, EcsPluginGroup } from "./plugin";
-import { Events } from "./ecs/events";
+import { Events, type EventClass } from "./ecs/events";
 import { EntityAddedEvent, EntityRemovedEvent, Commands } from "./ecs/commands";
 import { registerBuiltInSerializers } from "./ecs/serialization";
+import {
+  ObserverRegistry,
+  ObserverTrigger,
+  type ObserverCallback,
+  ComponentAdded,
+  ComponentRemoved,
+} from "./ecs/observer";
 
 export class App {
   #world: ECSWorld;
@@ -58,6 +68,14 @@ export class App {
     this.#events = new Events();
     this.#commands = new Commands(this);
 
+    // Initialize observer system resources
+    const observerTrigger = new ObserverTrigger();
+    this.setResource(new ObserverRegistry());
+    this.setResource(observerTrigger);
+
+    // Wire up the world to fire component lifecycle events
+    this.#world.setObserverTrigger(observerTrigger);
+
     // Auto-register built-in serializers on first App instance
     if (!App.#serializersRegistered) {
       registerBuiltInSerializers();
@@ -66,7 +84,9 @@ export class App {
   }
 
   public static create() {
-    return new App().addEvent(EntityAddedEvent).addEvent(EntityRemovedEvent);
+    return new App()
+      .addEvent(EntityAddedEvent)
+      .addEvent(EntityRemovedEvent);
   }
 
   public addSystems(
@@ -186,6 +206,9 @@ export class App {
         this.#scheduler.run(ESystemType.Update, this);
         this.#scheduler.run(ESystemType.PostUpdate, this);
 
+        // Flush observers after PostUpdate
+        this.#flushObservers();
+
         // Flush despawns after PostUpdate
         this.#commands.flushDespawns();
 
@@ -193,6 +216,9 @@ export class App {
           this.#scheduler.run(ESystemType.PreFixedUpdate, this);
           this.#scheduler.run(ESystemType.FixedUpdate, this);
           this.#scheduler.run(ESystemType.PostFixedUpdate, this);
+
+          // Flush observers after PostFixedUpdate
+          this.#flushObservers();
 
           // Flush despawns after each fixed update cycle
           this.#commands.flushDespawns();
@@ -225,6 +251,90 @@ export class App {
 
   public addEvent<T>(cls: new (...args: any[]) => T): this {
     this.#events.addEvent(cls);
+    return this;
+  }
+
+  /**
+   * Register an observer for a custom event type.
+   * The observer callback will be invoked whenever the event is triggered via commands.trigger().
+   *
+   * @param eventClass The event class to observe
+   * @param callback The callback to execute when the event is triggered
+   * @returns This App instance for chaining
+   *
+   * @example
+   * ```ts
+   * // Custom event observer
+   * app.addObserver(Explode, ({ trigger, commands }) => {
+   *   const entity = trigger.entity();
+   *   commands.despawnEntity(entity);
+   * });
+   * ```
+   */
+  public addObserver<T>(
+    eventClass: EventClass<T>,
+    callback: import("./ecs/observer").ObserverCallback<T>
+  ): this;
+
+  /**
+   * Register an observer for component lifecycle events (onAdded/onRemoved).
+   * The observer callback will be invoked when the component is added/removed from any entity.
+   *
+   * @param componentClass The component class to observe
+   * @param hook The lifecycle hook ("onAdded" or "onRemoved")
+   * @param callback The callback to execute - receives the component instance in trigger.event()
+   * @returns This App instance for chaining
+   *
+   * @example
+   * ```ts
+   * // Component added observer
+   * app.addObserver(Mine, "onAdded", ({ trigger, commands }) => {
+   *   const mine = trigger.event();  // The Mine component instance
+   *   const entity = trigger.entity();
+   *   // Add to spatial index
+   * });
+   *
+   * // Component removed observer
+   * app.addObserver(Mine, "onRemoved", ({ trigger, commands }) => {
+   *   const mine = trigger.event();  // The Mine component instance
+   *   // Remove from spatial index
+   * });
+   * ```
+   */
+  public addObserver<T>(
+    componentClass: import("./ecs/types").ComponentClass<T>,
+    hook: import("./ecs/observer").ObserverLifecycleHook,
+    callback: import("./ecs/observer").ObserverCallback<T>
+  ): this;
+
+  // Implementation
+  public addObserver<T>(
+    classOrEvent: EventClass<T> | import("./ecs/types").ComponentClass<T>,
+    callbackOrHook: import("./ecs/observer").ObserverCallback<T> | import("./ecs/observer").ObserverLifecycleHook,
+    maybeCallback?: import("./ecs/observer").ObserverCallback<T>
+  ): this {
+    const registry = this.getResource(ObserverRegistry);
+
+    // If second parameter is a function, it's a custom event observer
+    if (typeof callbackOrHook === "function") {
+      registry.register({
+        eventClass: classOrEvent as EventClass<T>,
+        callback: callbackOrHook as import("./ecs/observer").ObserverCallback<T>,
+      });
+      return this;
+    }
+
+    // Otherwise, it's a component lifecycle observer
+    const hook = callbackOrHook as import("./ecs/observer").ObserverLifecycleHook;
+    const callback = maybeCallback!;
+
+    registry.register({
+      eventClass: classOrEvent as any, // Will be used as a key
+      callback: callback as any,
+      lifecycleHook: hook,
+      componentClass: classOrEvent as import("./ecs/types").ComponentClass<T>,
+    });
+
     return this;
   }
 
@@ -281,6 +391,17 @@ export class App {
       }
     }
     return this;
+  }
+
+  /**
+   * Flush all queued observer triggers.
+   * This executes all observers for events that were triggered since the last flush.
+   * @internal
+   */
+  #flushObservers(): void {
+    const registry = this.getResource(ObserverRegistry);
+    const trigger = this.getResource(ObserverTrigger);
+    trigger.flush(registry, this.#commands);
   }
 
   #registerPlugin(plugin: EcsPlugin): void {
