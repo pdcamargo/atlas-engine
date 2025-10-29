@@ -22,14 +22,12 @@ export class ObserverRegistry {
    */
   public register<T>(descriptor: ObserverDescriptor<T>): void {
     const key = this.#keyFor(descriptor.eventClass);
-    console.log("[ObserverRegistry] Registering observer for:", key, "hook:", descriptor.lifecycleHook);
     let observers = this.#observers.get(key);
     if (!observers) {
       observers = [];
       this.#observers.set(key, observers);
     }
     observers.push(descriptor);
-    console.log("[ObserverRegistry] Total observers for", key, ":", observers.length);
   }
 
   /**

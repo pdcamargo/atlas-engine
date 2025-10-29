@@ -158,7 +158,7 @@ const setupSystem = sys(({ commands }) => {
 });
 
 const handleClickSystem = sys(({ commands }) => {
-  if (Math.random() < 0.1) {
+  if (Math.random() < 0.2) {
     commands.trigger(new ExplodeMines([0, 0], 10.0));
   }
 });
@@ -199,65 +199,76 @@ export class ObserverDemoPlugin implements EcsPlugin {
 
     // Observer 1: Add mines to spatial index when Mine component is added
     app.addObserver(Mine, "onAdded", ({ trigger, commands }) => {
-      const mine = trigger.event();
-      const entity = trigger.entity();
-      console.log("Mine added observer triggered for entity:", entity);
       const index = commands.getResource(SpatialIndex);
-      index.add(entity, mine.pos);
+
+      // Batch processing: iterate over all [mine, entity] pairs
+      for (const [mine, entity] of trigger.events()) {
+        index.add(entity, mine.pos);
+      }
+
+      console.log(`Mine added observer: processed ${trigger.count()} mines`);
     });
 
     // Observer 2: Remove mines from spatial index when Mine component is removed
     app.addObserver(Mine, "onRemoved", ({ trigger, commands }) => {
-      const mine = trigger.event();
-      const entity = trigger.entity();
       const index = commands.getResource(SpatialIndex);
-      index.remove(entity, mine.pos);
+
+      // Batch processing: iterate over all [mine, entity] pairs
+      for (const [mine, entity] of trigger.events()) {
+        index.remove(entity, mine.pos);
+      }
+
+      console.log(`Mine removed observer: processed ${trigger.count()} mines`);
     });
 
     // Observer 3: Handle individual mine explosions
     app.addObserver(Explode, ({ trigger, commands }) => {
-      const entity = trigger.entity();
-      console.log("Explode observer triggered for entity:", entity);
-      const mine = commands.tryGetComponent(entity, Mine);
-      if (!mine) {
-        console.log("No mine component found for entity:", entity);
-        return;
+      const gameState = commands.getResource(GameState);
+
+      // Batch processing: iterate over all [event, entity] pairs
+      for (const [, entity] of trigger.events()) {
+        const mine = commands.tryGetComponent(entity, Mine);
+        if (!mine) continue;
+
+        // Update stats
+        gameState.explosionCount++;
+        gameState.mineCount--;
+
+        // Despawn the mine
+        commands.despawnEntity(entity);
+
+        // Trigger cascade explosion
+        commands.trigger(new ExplodeMines(mine.pos, mine.size));
       }
 
-      // Update stats
-      const gameState = commands.getResource(GameState);
-      gameState.explosionCount++;
-      gameState.mineCount--;
-
-      // Despawn the mine
-      commands.despawnEntity(entity);
-
-      // Trigger cascade explosion
-      commands.trigger(new ExplodeMines(mine.pos, mine.size));
+      console.log(`Explode observer: processed ${trigger.count()} explosions`);
     });
 
     // Observer 4: Find nearby mines and trigger their explosions
     app.addObserver(ExplodeMines, ({ trigger, commands }) => {
-      console.log("ExplodeMines observer triggered");
-      const event = trigger.event();
       const index = commands.getResource(SpatialIndex);
 
-      const nearby = index.getNearby(event.pos);
+      // Batch processing: iterate over all [event, entity] pairs
+      for (const [event] of trigger.events()) {
+        const nearby = index.getNearby(event.pos);
 
-      for (const nearbyEntity of nearby) {
-        const nearbyMine = commands.tryGetComponent(nearbyEntity, Mine);
-        if (!nearbyMine) continue;
+        for (const nearbyEntity of nearby) {
+          const nearbyMine = commands.tryGetComponent(nearbyEntity, Mine);
+          if (!nearbyMine) continue;
 
-        // Check if mine is within explosion radius
-        const dx = nearbyMine.pos[0] - event.pos[0];
-        const dy = nearbyMine.pos[1] - event.pos[1];
-        const distance = Math.sqrt(dx * dx + dy * dy);
+          // Check if mine is within explosion radius
+          const dx = nearbyMine.pos[0] - event.pos[0];
+          const dy = nearbyMine.pos[1] - event.pos[1];
+          const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance < nearbyMine.size + event.radius) {
-          // Trigger explosion on this mine
-          commands.trigger(new Explode(), nearbyEntity);
+          if (distance < nearbyMine.size + event.radius) {
+            // Trigger explosion on this mine
+            commands.trigger(new Explode(), nearbyEntity);
+          }
         }
       }
+
+      console.log(`ExplodeMines observer: processed ${trigger.count()} explosion zones`);
     });
   }
 }

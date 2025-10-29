@@ -3,10 +3,22 @@
         "height": 4300,
         "width": 2
     },
-    "activeFile": "",
+    "activeFile": "prototype-map.tmj",
     "expandedProjectPaths": [
     ],
     "fileStates": {
+        "prototype-map.tmj": {
+            "scale": 1,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 266,
+                "y": 125.5
+            }
+        },
+        "protype-tileset.tsj": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        }
     },
     "frame.defaultDuration": 110,
     "last.imagePath": "//wsl.localhost/Ubuntu/home/pdcamargo/dev/atlas/apps/web/public/tiled",
@@ -14,9 +26,13 @@
     "map.tileHeight": 16,
     "map.tileWidth": 16,
     "openFiles": [
+        "protype-tileset.tsj",
+        "prototype-map.tmj"
     ],
     "project": "prototype.tiled-project",
     "recentFiles": [
+        "protype-tileset.tsj",
+        "prototype-map.tmj"
     ],
     "tileset.lastUsedFormat": "json",
     "tileset.tileSize": {

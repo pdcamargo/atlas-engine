@@ -46,7 +46,6 @@ export class World {
           if (!value) continue;
           const cls = (value as any).constructor as ComponentClass<unknown>;
           // Trigger with component instance as the event, using class as key
-          console.log("[World] Triggering component added:", cls.name, "for entity:", entity);
           this.#observerTrigger.triggerComponent(cls, "onAdded", value, entity);
         }
       }
