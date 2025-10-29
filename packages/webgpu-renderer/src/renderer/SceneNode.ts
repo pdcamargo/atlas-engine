@@ -7,6 +7,7 @@ import {
   Vector3Like,
 } from "@atlas/core";
 import { mat4, Mat4 } from "gl-matrix";
+import { type SceneGraph } from "./SceneGraph";
 
 const uuidv4 = () => {
   return crypto.randomUUID();
@@ -18,6 +19,8 @@ const uuidv4 = () => {
  */
 export class SceneNode {
   public id: string;
+
+  public sceneGraph: SceneGraph | null = null;
 
   protected _parent: SceneNode | null = null;
   protected _children: SceneNode[] = [];
@@ -66,6 +69,8 @@ export class SceneNode {
     child._parent = this;
     this._children.push(child);
     child.markDirty();
+
+    child.sceneGraph = this.sceneGraph;
   }
 
   /**
@@ -101,6 +106,16 @@ export class SceneNode {
    */
   getParent(): SceneNode | null {
     return this._parent;
+  }
+
+  getSceneGraph(): SceneGraph | null {
+    return this.sceneGraph;
+  }
+
+  setSceneGraph(sceneGraph: SceneGraph | null): void {
+    this.traverse((node) => {
+      node.sceneGraph = sceneGraph;
+    });
   }
 
   /**

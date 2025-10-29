@@ -1,7 +1,6 @@
 // import {
 //   App,
 //   createSet,
-//   DefaultPlugin,
 //   EcsPlugin,
 //   Physics2DPlugin,
 // } from "@atlas/engine";
@@ -17,7 +16,6 @@
 // import { GameState } from "./resources/game-state";
 // import { addTilesSystem, buildWorld } from "./systems/build-world";
 // import { movePlayer } from "./systems/move-player";
-// import { TauriFileSystemAdapter } from "../../plugins/file-system";
 
 // class ChunkSettings {
 //   readonly size = 16;
@@ -37,10 +35,6 @@
 //       .setResource(new BuildRequests())
 //       .setResource(new WorldGrid())
 //       .addPlugins(
-//         new DefaultPlugin({
-//           fileSystemAdapter: new TauriFileSystemAdapter(),
-//           canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-//         }),
 //         new Physics2DPlugin({ gravity: { x: 0, y: 0 } }),
 //         new Renderer2DPlugin({
 //           canvas:

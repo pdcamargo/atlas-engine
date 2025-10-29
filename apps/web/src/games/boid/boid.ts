@@ -7,9 +7,7 @@
 
 import {
   App,
-  DefaultPlugin,
   EcsPlugin,
-  SceneGraph,
   Sprite,
   Color,
   MainCamera,
@@ -20,9 +18,9 @@ import {
   PerspectiveCamera,
 } from "@atlas/engine";
 
-import { TauriFileSystemAdapter } from "../../plugins/file-system";
 import {
   BoidComputeWorker,
+  BoidUpdateShader,
   DEFAULT_BOID_PARAMS,
   type BoidSimParams,
 } from "./boid-compute";
@@ -60,17 +58,11 @@ function createBoidImageData() {
 
 export class BoidGamePlugin implements EcsPlugin {
   private boidCount = 5000; // Number of boids in the simulation
-  private boidSize = 0.05; // Visual size of each boid
+  private boidSize = 2; // Visual size of each boid
 
   build(app: App) {
     app
-      .addPlugins(
-        new DefaultPlugin({
-          fileSystemAdapter: new TauriFileSystemAdapter(),
-          canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-        })
-      )
-      .addStartupSystems(async ({ commands }) => {
+      .addStartupSystems(({ commands }) => {
         console.log("🐦 Initializing Boids Simulation...");
 
         const imageData = createBoidImageData();
@@ -87,7 +79,6 @@ export class BoidGamePlugin implements EcsPlugin {
         });
 
         // Create scene graph
-        const sceneGraph = new SceneGraph();
 
         // Create compute worker for boid simulation
         const boidWorker = new BoidComputeWorker(
@@ -97,16 +88,8 @@ export class BoidGamePlugin implements EcsPlugin {
         const worker = boidWorker.build(device);
 
         // Check for shader compilation errors (async, won't block initialization)
-        const { BoidUpdateShader } = await import("./boid-compute");
         const shader = new BoidUpdateShader();
-        const messages = await shader.checkCompilation(device);
-        for (const msg of messages) {
-          if (msg.type === "error") {
-            console.error("❌ Boid shader error:", msg.message);
-          } else if (msg.type === "warning") {
-            console.warn("⚠️ Boid shader warning:", msg.message);
-          }
-        }
+        shader.checkCompilation(device);
 
         // Create sprites for each boid
         const boidSprites: Sprite[] = [];
@@ -126,7 +109,6 @@ export class BoidGamePlugin implements EcsPlugin {
           sprite.setTint(colors[colorIndex]);
 
           commands.spawn(sprite, nearestFilter);
-          sceneGraph.addRoot(sprite);
           boidSprites.push(sprite);
         }
 
@@ -142,15 +124,18 @@ export class BoidGamePlugin implements EcsPlugin {
         commands.spawn(simulation);
 
         const aspectRatio = 1;
-        const near = 0.1;
-        const far = 100;
+        const near = 0.01;
+        const far = 10000;
         // Create camera
-        const camera = new PerspectiveCamera(Math.PI / 4, aspectRatio, near, far);
+        const camera = new PerspectiveCamera(
+          Math.PI / 4,
+          aspectRatio,
+          near,
+          far
+        );
         camera.position.set(0, 0, 5);
-        // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 
         commands.spawn(camera, new MainCamera());
-        commands.spawn(sceneGraph);
 
         console.log(
           `✅ Boids simulation initialized with ${this.boidCount} boids`

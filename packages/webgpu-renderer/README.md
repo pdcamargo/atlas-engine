@@ -56,7 +56,7 @@ async function main() {
   const square = new Square(1.0);
   square.setColor(1, 0, 0, 1);
   vec3.set(square.position, -1, 0, 0);
-  sceneGraph.addRoot(square);
+  sceneGraph.addChild(square);
 
   // Render loop
   function animate() {
@@ -328,7 +328,7 @@ Container for scene nodes with traversal support.
 ```typescript
 class SceneGraph {
   // Add a root-level node
-  addRoot(node: SceneNode): void;
+  addChild(node: SceneNode): void;
 
   // Remove a root-level node
   removeRoot(node: SceneNode): void;
@@ -564,7 +564,7 @@ child.setColor(1, 0, 1, 1);
 vec3.set(child.position, 1, 0, 0); // Offset from parent
 
 parent.addChild(child);
-sceneGraph.addRoot(parent);
+sceneGraph.addChild(parent);
 
 // Rotating parent will also rotate child
 parent.rotation[2] = Math.PI / 4;
@@ -593,7 +593,7 @@ const texture = Texture.fromSource(renderer.getDevice(), img);
 // Create sprite with texture
 const sprite = new Sprite(texture, 2.0, 2.0);
 vec3.set(sprite.position, 0, 0, 0);
-sceneGraph.addRoot(sprite);
+sceneGraph.addChild(sprite);
 ```
 
 ### Animation

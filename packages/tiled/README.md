@@ -30,9 +30,7 @@ import { TiledEcsPlugin, TiledTileMap } from "@atlas/tiled";
 import { App } from "@atlas/core";
 import { TiledEcsPlugin } from "@atlas/tiled";
 
-await App.create()
-  .addPlugins(new TiledEcsPlugin())
-  .run();
+await App.create().addPlugins(new TiledEcsPlugin()).run();
 ```
 
 ### 2. Load a Tiled Map
@@ -52,7 +50,7 @@ const startupSystem = sys(({ commands }) => {
   const tiledMap = new TiledTileMap(mapHandle);
 
   // IMPORTANT: Add to scene graph for rendering
-  sceneGraph.addRoot(tiledMap);
+  sceneGraph.addChild(tiledMap);
 
   // Spawn as component for ECS tracking
   commands.spawn(tiledMap);
@@ -64,12 +62,14 @@ app.addStartupSystems(startupSystem);
 ### 3. Export from Tiled
 
 In Tiled Map Editor:
+
 1. Create your map with tiles and objects
-2. **File → Export As...** → Choose **JSON map files (*.tmj)**
+2. **File → Export As...** → Choose **JSON map files (\*.tmj)**
 3. Place the exported `.tmj` file in your public assets folder
 
 For external tilesets:
-1. Right-click tileset → **Export As...** → Choose **JSON tilesets (*.tsj)**
+
+1. Right-click tileset → **Export As...** → Choose **JSON tilesets (\*.tsj)**
 2. Ensure paths are relative to the map file
 
 ## Scene Hierarchy
@@ -99,17 +99,17 @@ Main component for Tiled map instances.
 ```typescript
 class TiledTileMap extends Container {
   // Properties
-  mapHandle: Handle<TiledMapAsset>;           // Map asset handle
-  tileMap: TileMap | null;                    // Renderer tilemap
-  objectLayersContainer: Container | null;     // Object layers root
-  tilesets: Map<number, TileSet>;             // firstgid → TileSet mapping
-  loaded: boolean;                             // Initialization state
+  mapHandle: Handle<TiledMapAsset>; // Map asset handle
+  tileMap: TileMap | null; // Renderer tilemap
+  objectLayersContainer: Container | null; // Object layers root
+  tilesets: Map<number, TileSet>; // firstgid → TileSet mapping
+  loaded: boolean; // Initialization state
   objectLayerContainers: Map<string, Container>; // Name → Container mapping
 
   // Methods
-  constructor(mapHandle: Handle<TiledMapAsset>, id?: string)
-  findTilesetForGID(gid: number): { tileset: TileSet; localId: number } | null
-  getObjectLayerContainer(layerName: string): Container | undefined
+  constructor(mapHandle: Handle<TiledMapAsset>, id?: string);
+  findTilesetForGID(gid: number): { tileset: TileSet; localId: number } | null;
+  getObjectLayerContainer(layerName: string): Container | undefined;
 }
 ```
 
@@ -130,10 +130,10 @@ class TiledEcsPlugin implements EcsPlugin {
 
 ```typescript
 class TiledMapAsset {
-  data: TiledMap;                    // Parsed Tiled map data
-  path: string;                      // File path
+  data: TiledMap; // Parsed Tiled map data
+  path: string; // File path
 
-  getBaseDirectory(): string;        // Get directory path
+  getBaseDirectory(): string; // Get directory path
   resolvePath(relativePath: string): string; // Resolve relative path
 }
 ```
@@ -142,8 +142,8 @@ class TiledMapAsset {
 
 ```typescript
 class TiledTilesetAsset {
-  data: TiledTileset;                // Parsed tileset data
-  path: string;                      // File path
+  data: TiledTileset; // Parsed tileset data
+  path: string; // File path
 
   getBaseDirectory(): string;
   resolveImagePath(relativePath: string): string;
@@ -205,7 +205,9 @@ Animated tiles from Tiled are automatically converted to `AnimatedTile` instance
 if (tiledMap.tileMap) {
   for (const layer of tiledMap.tileMap.getLayers()) {
     const animatedTiles = layer.getAnimatedTiles();
-    console.log(`Layer ${layer.name} has ${animatedTiles.length} animated tiles`);
+    console.log(
+      `Layer ${layer.name} has ${animatedTiles.length} animated tiles`
+    );
   }
 }
 ```
@@ -255,20 +257,20 @@ const checkMapLoadedSystem = sys(({ commands }) => {
 
 ### Supported Features
 
-| Feature | Supported | Notes |
-|---------|-----------|-------|
-| Orthogonal maps | ✅ Yes | Fully supported |
-| Isometric maps | ⚠️ Partial | Basic support, needs testing |
-| Hexagonal maps | ⚠️ Partial | Basic support, needs testing |
-| Tile layers | ✅ Yes | Full support |
-| Object layers | ✅ Yes | Tile objects converted to Sprites |
-| Image layers | ❌ No | Not yet implemented |
-| Group layers | ✅ Yes | Recursive processing |
-| Animated tiles | ✅ Yes | Auto-converted to AnimatedTile |
-| Tile flipping | ✅ Yes | Horizontal/vertical via scale |
-| Layer tinting | ✅ Yes | Applied to renderer layer |
-| Layer opacity | ❌ No | Not supported by renderer yet |
-| Parallax scrolling | ❌ No | Not yet implemented |
+| Feature            | Supported  | Notes                             |
+| ------------------ | ---------- | --------------------------------- |
+| Orthogonal maps    | ✅ Yes     | Fully supported                   |
+| Isometric maps     | ⚠️ Partial | Basic support, needs testing      |
+| Hexagonal maps     | ⚠️ Partial | Basic support, needs testing      |
+| Tile layers        | ✅ Yes     | Full support                      |
+| Object layers      | ✅ Yes     | Tile objects converted to Sprites |
+| Image layers       | ❌ No      | Not yet implemented               |
+| Group layers       | ✅ Yes     | Recursive processing              |
+| Animated tiles     | ✅ Yes     | Auto-converted to AnimatedTile    |
+| Tile flipping      | ✅ Yes     | Horizontal/vertical via scale     |
+| Layer tinting      | ✅ Yes     | Applied to renderer layer         |
+| Layer opacity      | ❌ No      | Not supported by renderer yet     |
+| Parallax scrolling | ❌ No      | Not yet implemented               |
 
 ### Object Layer Recommendations
 
@@ -279,6 +281,7 @@ When using object layers in Tiled:
    - Position, rotation, and flipping are preserved
 
 2. **Named Objects:** Give objects names for easy lookup
+
    ```typescript
    // Objects with names can be found by iterating children
    const enemiesLayer = tiledMap.getObjectLayerContainer("Enemies");
@@ -328,7 +331,7 @@ import {
   tiledPixelsToWorldUnits,
   tileToWorldPosition,
   objectToWorldPosition,
-  tiledRotationToRadians
+  tiledRotationToRadians,
 } from "@atlas/tiled";
 
 // Convert pixels to world units (uses PixelsPerUnit)
@@ -358,7 +361,7 @@ import {
   isObjectGroup,
   isGroup,
   isEmbeddedTileset,
-  isTilesetRef
+  isTilesetRef,
 } from "@atlas/tiled";
 ```
 

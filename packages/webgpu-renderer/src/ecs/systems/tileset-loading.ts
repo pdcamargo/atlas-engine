@@ -29,8 +29,6 @@ export const tileSetLoadingSystem = sys(({ commands }) => {
   for (const [entity, tileMap] of commands.query(unsynced).all()) {
     let allTileSetsLoaded = true;
 
-    console.log(tileMap, " tilemap");
-
     // Get all unique tilesets (from placed tiles, pending tiles, and pending grids)
     const allTileSets = tileMap.getAllTileSets();
 
@@ -64,9 +62,6 @@ export const tileSetLoadingSystem = sys(({ commands }) => {
       // Get the loaded asset
       const imageAsset = assetServer.getAsset<ImageAsset>(handle);
       if (!imageAsset || !imageAsset.image) {
-        console.warn(
-          `[TileSetLoading] ImageAsset loaded but has no image data`
-        );
         allTileSetsLoaded = false;
         continue;
       }
@@ -91,13 +86,7 @@ export const tileSetLoadingSystem = sys(({ commands }) => {
         tileSet.texture = texture;
       }
 
-      // Sync any pending tile grids that were deferred
-      const syncedGrids = tileSet.syncPendingTileGrids();
-      if (syncedGrids > 0) {
-        console.log(
-          `[TileSetLoading] Created ${syncedGrids} pending tile grid(s) for tileset ${tileSet.id}`
-        );
-      }
+      tileSet.syncPendingTileGrids();
     }
 
     const syncResult = tileMap.syncPendingTilesBatch(1000000, Infinity);

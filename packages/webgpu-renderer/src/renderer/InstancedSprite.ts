@@ -49,25 +49,25 @@ import { Vector3 } from "@atlas/core";
  * for (let i = 0; i < 5000; i++) {
  *   const particle = new InstancedSprite(sparkTexture, 8, 8);
  *   particle.setPosition({ x: Math.random() * 100, y: Math.random() * 100 });
- *   sceneGraph.addRoot(particle);
+ *   sceneGraph.addChild(particle);
  * }
  *
  * // Enemy crowds (100s of enemies)
  * for (let i = 0; i < 200; i++) {
  *   const enemy = new InstancedSprite(enemyTexture, 32, 32);
  *   enemy.setPosition({ x: i * 10, y: Math.random() * 50 });
- *   sceneGraph.addRoot(enemy);
+ *   sceneGraph.addChild(enemy);
  * }
  *
  * // Projectiles/bullets
  * const bullet = new InstancedSprite(bulletTexture, 4, 8);
  * bullet.setPosition({ x: playerX, y: playerY });
- * sceneGraph.addRoot(bullet);
+ * sceneGraph.addChild(bullet);
  *
  * // Environmental effects (leaves, rain, etc.)
  * const leaf = new InstancedSprite(leafTexture, 16, 16);
  * leaf.setPosition({ x: Math.random() * 200, y: 0 });
- * sceneGraph.addRoot(leaf);
+ * sceneGraph.addChild(leaf);
  * ```
  *
  * ### ❌ Don't Use For:
@@ -142,7 +142,7 @@ import { Vector3 } from "@atlas/core";
  *         1
  *       ));
  *
- *       sceneGraph.addRoot(particle);
+ *       sceneGraph.addChild(particle);
  *       this.particles.push(particle);
  *     }
  *   }

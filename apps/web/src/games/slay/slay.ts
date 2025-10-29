@@ -1,10 +1,8 @@
 import {
   App,
-  DefaultPlugin,
   EcsPlugin,
   AssetServer,
   ImageAsset,
-  SceneGraph,
   Sprite,
   Color,
   PerspectiveCamera,
@@ -32,17 +30,9 @@ import {
   PixelsPerUnit,
 } from "@atlas/engine";
 
-import { TauriFileSystemAdapter } from "../../plugins/file-system";
-
 export class SlayGamePlugin implements EcsPlugin {
   build(app: App) {
     app
-      .addPlugins(
-        new DefaultPlugin({
-          fileSystemAdapter: new TauriFileSystemAdapter(),
-          canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-        })
-      )
       .addStartupSystems(({ commands }) => {
         // Set global pixels-per-unit: 16 pixels = 1 world unit
         // This ensures sprites and tiles with same pixel size render at same size
@@ -67,9 +57,6 @@ export class SlayGamePlugin implements EcsPlugin {
         const tilemapHandle = assetServer.load<ImageAsset>(
           "/sprites/Assets.png"
         );
-
-        // Create scene graph
-        const sceneGraph = new SceneGraph();
 
         const frames = 8;
         const frameWidth = 1 / frames;
@@ -128,7 +115,6 @@ export class SlayGamePlugin implements EcsPlugin {
         // // We need to wait for texture to load before calling addTilesFromGrid
         // // For now, let's add a simple update system to handle this
 
-        sceneGraph.addRoot(tilemap);
         commands.spawn(tilemap, nearestFilter);
 
         for (let i = 0; i < 0; i++) {
@@ -143,7 +129,6 @@ export class SlayGamePlugin implements EcsPlugin {
             x: Math.random() * 10,
             y: Math.random() * 10,
           });
-          sceneGraph.addRoot(sprite);
         }
 
         const getX = (index: number) => index * frameWidth;
@@ -246,7 +231,6 @@ export class SlayGamePlugin implements EcsPlugin {
           }
 
           commands.spawn(animatedSprite, nearestFilter);
-          sceneGraph.addRoot(animatedSprite);
 
           const pos = {
             x: Math.random() * 5 - 2.5,
@@ -285,7 +269,6 @@ export class SlayGamePlugin implements EcsPlugin {
         camera.position.set(0, 0, 5);
 
         commands.spawn(camera, new MainCamera());
-        commands.spawn(sceneGraph);
 
         // Load audio clip
         const clipHandle = assetServer.load<AudioClip>("/level-up.mp3");
@@ -308,22 +291,22 @@ export class SlayGamePlugin implements EcsPlugin {
         // Add particle effects
         // const fireEffect = ParticlePresets.fire({ intensity: 0.1 });
         // fireEffect.setPosition({ x: 0, y: 0, z: 0 });
-        // sceneGraph.addRoot(fireEffect);
+        // sceneGraph.addChild(fireEffect);
         // commands.spawn(fireEffect);
 
         // const smokeEffect = ParticlePresets.smoke({ intensity: 0.15 });
         // smokeEffect.setPosition({ x: 0, y: 0, z: 0 });
-        // sceneGraph.addRoot(smokeEffect);
+        // sceneGraph.addChild(smokeEffect);
         // commands.spawn(smokeEffect);
 
         // const sparklesEffect = ParticlePresets.sparkles({ intensity: 1.0 });
         // sparklesEffect.setPosition({ x: 0, y: 0, z: 0 });
-        // sceneGraph.addRoot(sparklesEffect);
+        // sceneGraph.addChild(sparklesEffect);
         // commands.spawn(sparklesEffect);
 
         const magicEffect = ParticlePresets.magic({ intensity: 0.17 });
         magicEffect.setPosition({ x: 0, y: 0, z: 0 });
-        // sceneGraph.addRoot(magicEffect);
+        // sceneGraph.addChild(magicEffect);
         commands.spawn(magicEffect);
 
         // Add post-processing effects to renderer

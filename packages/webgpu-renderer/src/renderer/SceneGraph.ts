@@ -10,21 +10,25 @@ export class SceneGraph {
   /**
    * Add a root-level node to the scene graph
    */
-  addRoot(node: SceneNode): void {
+  addChild(node: SceneNode): void {
     if (node.getParent()) {
       node.removeFromParent();
     }
     this._roots.push(node);
+
+    node.setSceneGraph(this);
   }
 
   /**
    * Remove a root-level node from the scene graph
    */
-  removeRoot(node: SceneNode): void {
+  removeChild(node: SceneNode): void {
     const index = this._roots.indexOf(node);
     if (index !== -1) {
       this._roots.splice(index, 1);
     }
+
+    node.setSceneGraph(null);
   }
 
   /**

@@ -7,24 +7,18 @@
 
 import {
   App,
-  DefaultPlugin,
   EcsPlugin,
-  SceneGraph,
   Sprite,
   Color,
   OrthographicCamera,
   MainCamera,
-  Time,
   GpuRenderDevice,
-  AssetServer,
-  ImageAsset,
   TextureFilter,
   Texture,
   Input,
   KeyCode,
 } from "@atlas/engine";
 
-import { TauriFileSystemAdapter } from "../../plugins/file-system";
 import {
   GameOfLifeComputeWorker,
   GameOfLifePatterns,
@@ -50,7 +44,7 @@ class GameOfLifeSimulation {
 }
 
 function createGOLImage() {
-  const size = 100;
+  const size = 500;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -73,18 +67,12 @@ function createGOLImage() {
 export class GameOfLifePlugin implements EcsPlugin {
   private gridWidth = 32; // Grid width in cells (small for testing)
   private gridHeight = 32; // Grid height in cells
-  private cellSize = 0.1; // Visual size of each cell (large for visibility)
+  private cellSize = 10; // Visual size of each cell (large for visibility)
   private updateInterval = 200; // Milliseconds between generations (slower for debugging)
   private lastUpdate = 0;
 
   build(app: App) {
     app
-      .addPlugins(
-        new DefaultPlugin({
-          fileSystemAdapter: new TauriFileSystemAdapter(),
-          canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-        })
-      )
       .addStartupSystems(({ commands }) => {
         console.log("🎮 Initializing Conway's Game of Life...");
 
@@ -101,7 +89,6 @@ export class GameOfLifePlugin implements EcsPlugin {
         });
 
         // Create scene graph
-        const sceneGraph = new SceneGraph();
 
         // Create compute worker with random initial state
         const initialState = GameOfLifePatterns.random(
@@ -144,7 +131,6 @@ export class GameOfLifePlugin implements EcsPlugin {
             sprite.setTint(initialState[index] === 1 ? aliveColor : deadColor);
 
             commands.spawn(sprite, nearestFilter);
-            sceneGraph.addRoot(sprite);
             cellSprites.push(sprite);
           }
         }
@@ -166,11 +152,10 @@ export class GameOfLifePlugin implements EcsPlugin {
         const size = viewHeight / 2; // OrthographicCamera takes half-height as size
 
         const camera = new OrthographicCamera(size, 0.1, 100);
-        camera.position.set(0, 0, 5);
+        camera.position.set(0, 0, 3);
         // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 
         commands.spawn(camera, new MainCamera());
-        commands.spawn(sceneGraph);
 
         console.log(
           `✅ Game of Life initialized (${this.gridWidth}x${this.gridHeight} grid)`
@@ -186,7 +171,6 @@ export class GameOfLifePlugin implements EcsPlugin {
       })
       .addUpdateSystems(async ({ commands }) => {
         const [, simulation] = commands.query(GameOfLifeSimulation).find();
-        const time = commands.getResource(Time);
         const input = commands.getResource(Input);
 
         // Handle keyboard input

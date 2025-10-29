@@ -18,13 +18,13 @@ export const render = sys(({ commands }) => {
     return;
   }
 
-  for (const [, sceneGraph] of sceneGraphs) {
-    for (const [, orthoCamera] of orthoCameras) {
-      renderer.render(orthoCamera, sceneGraph);
-    }
+  const sceneGraph = commands.getResource(SceneGraph);
 
-    for (const [, perspectiveCamera] of perspectiveCameras) {
-      renderer.render(perspectiveCamera, sceneGraph);
-    }
+  for (const [, orthoCamera] of orthoCameras) {
+    renderer.render(orthoCamera, sceneGraph);
+  }
+
+  for (const [, perspectiveCamera] of perspectiveCameras) {
+    renderer.render(perspectiveCamera, sceneGraph);
   }
 }).label("WebgpuRenderer::Render");

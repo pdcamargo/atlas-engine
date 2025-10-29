@@ -1,8 +1,6 @@
 import {
   App,
-  DefaultPlugin,
   EcsPlugin,
-  SceneGraph,
   PerspectiveCamera,
   MainCamera,
   Input,
@@ -10,7 +8,6 @@ import {
   Time,
   PixelsPerUnit,
   AssetServer,
-  TiledEcsPlugin,
   TiledTileMap,
   TiledMapAsset,
 } from "@atlas/engine";
@@ -18,12 +15,6 @@ import {
 export class TiledGamePlugin implements EcsPlugin {
   build(app: App) {
     app
-      .addPlugins(
-        new DefaultPlugin({
-          canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-        }),
-        new TiledEcsPlugin()
-      )
       .addStartupSystems(({ commands }) => {
         // Set global pixels-per-unit: 100 pixels = 1 world unit
         // With 16px tiles, each tile is 0.16 world units
@@ -34,10 +25,7 @@ export class TiledGamePlugin implements EcsPlugin {
         // Map will be at z=0, camera at z=5
         camera.position.set(2.4, 1.6, 5); // Center on 30x20 tile map (30*16/100 = 4.8 / 2 = 2.4)
 
-        const sceneGraph = new SceneGraph();
-
         commands.spawn(camera, new MainCamera());
-        commands.spawn(sceneGraph);
 
         const assetServer = commands.getResource(AssetServer);
         const mapHandle = assetServer.load<TiledMapAsset>(
@@ -49,16 +37,11 @@ export class TiledGamePlugin implements EcsPlugin {
         // Position at origin
         tiledMap.setPosition({ x: 0, y: 0, z: 0 });
 
-        // Add to scene graph so it renders
-        sceneGraph.addRoot(tiledMap);
-
         // Spawn as component
         commands.spawn(tiledMap);
       })
       .addUpdateSystems(({ commands }) => {
-        const [, camera] = commands
-          .query(PerspectiveCamera, MainCamera)
-          .find();
+        const [, camera] = commands.query(PerspectiveCamera, MainCamera).find();
         const input = commands.getResource(Input);
         const time = commands.getResource(Time);
 

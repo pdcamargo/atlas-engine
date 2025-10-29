@@ -1,6 +1,6 @@
 import { Sprite } from "./Sprite";
 import { Texture } from "./Texture";
-import { Rect, Color, Handle, ImageAsset, type EventClass } from "@atlas/core";
+import { Rect, Handle, ImageAsset, type EventClass } from "@atlas/core";
 
 /**
  * Represents a single frame in an animation

@@ -119,7 +119,7 @@ export class WebgpuRenderer {
     this.canvas = options.canvas || this.createCanvas();
     this.clearColor = options.clearColor || {
       r: 51 / 255,
-      g: 255 / 255,
+      g: 0.5,
       b: 255 / 255,
       a: 1.0,
     };

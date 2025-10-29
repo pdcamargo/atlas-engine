@@ -1,4 +1,5 @@
 import {
+  Commands,
   createSet,
   SerializationRegistry,
   SystemType,
@@ -22,16 +23,25 @@ import { lightingUpdateSystem } from "./systems/lighting-update";
 import { TextureCache } from "./resources/texture-cache";
 import { MaterialSerializer } from "../serialization";
 import { Material } from "../materials";
+import { Sprite } from "../renderer/Sprite";
+import { SceneGraph } from "../renderer/SceneGraph";
+import { SceneNode } from "../renderer/SceneNode";
+import { AnimatedSprite } from "../renderer/AnimatedSprite";
+import { TileMap } from "../renderer/tilemap";
+import { InstancedSprite } from "../renderer/InstancedSprite";
 
 const ResizeSystem = Symbol("WebgpuRenderer::PreUpdate");
 const LoadingSystem = Symbol("WebgpuRenderer::TextureLoading");
 const AnimationSystem = Symbol("WebgpuRenderer::Animation");
 const LightingSystem_Symbol = Symbol("WebgpuRenderer::LightingUpdate");
-const ParticleSystem = Symbol("WebgpuRenderer::ParticleUpdate");
 const RenderSystem = Symbol("WebgpuRenderer::Render");
 
 export type WebgpuRendererPluginOptions = {
   canvas?: HTMLCanvasElement;
+};
+
+const addToSceneGraph = (node: SceneNode, commands: Commands) => {
+  commands.getResource(SceneGraph).addChild(node);
 };
 
 export class WebgpuRendererPlugin implements EcsPlugin {
@@ -59,6 +69,7 @@ export class WebgpuRendererPlugin implements EcsPlugin {
       .setResource(new GpuRenderDevice(renderer.gpu.device))
       .setResource(new GpuPresentationFormat(renderer.gpu.format))
       .setResource(new GpuCanvasContext(renderer.gpu.context))
+      .setResource(new SceneGraph())
       .addSystems(SystemType.PreUpdate, createSet(ResizeSystem, resize))
       .addSystems(
         SystemType.PreUpdate,
@@ -77,7 +88,27 @@ export class WebgpuRendererPlugin implements EcsPlugin {
         SystemType.Update,
         createSet(LightingSystem_Symbol, lightingUpdateSystem)
       )
-      .addSystems(SystemType.Render, createSet(RenderSystem, render));
+      .addSystems(SystemType.Render, createSet(RenderSystem, render))
+      .addObserver(Sprite, "onAdded", ({ trigger, commands }) => {
+        for (const [sprite] of trigger.events()) {
+          addToSceneGraph(sprite, commands);
+        }
+      })
+      .addObserver(AnimatedSprite, "onAdded", ({ trigger, commands }) => {
+        for (const [animatedSprite] of trigger.events()) {
+          addToSceneGraph(animatedSprite, commands);
+        }
+      })
+      .addObserver(TileMap, "onAdded", ({ trigger, commands }) => {
+        for (const [tileMap] of trigger.events()) {
+          addToSceneGraph(tileMap, commands);
+        }
+      })
+      .addObserver(InstancedSprite, "onAdded", ({ trigger, commands }) => {
+        for (const [instancedSprite] of trigger.events()) {
+          addToSceneGraph(instancedSprite, commands);
+        }
+      });
   }
 
   public ready(app: App) {

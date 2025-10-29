@@ -1,6 +1,5 @@
 import {
   App,
-  DefaultPlugin,
   EcsPlugin,
   AssetServer,
   ImageAsset,
@@ -25,8 +24,6 @@ import {
   TimelineMarkerEvent,
   ControllerStateChangedEvent,
 } from "@atlas/engine";
-
-import { TauriFileSystemAdapter } from "../../plugins/file-system";
 
 // Custom event for timeline marker
 class ExplosionEvent {
@@ -55,17 +52,10 @@ class AnimatorDemoState {
 export class AnimatorDemoPlugin implements EcsPlugin {
   build(app: App) {
     app
-      .addPlugins(
-        new DefaultPlugin({
-          fileSystemAdapter: new TauriFileSystemAdapter(),
-          canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-        }),
-        new AnimatorPlugin()
-      )
+      .addPlugins(new AnimatorPlugin())
       .addEvent(ExplosionEvent)
       .addStartupSystems(({ commands }) => {
         const assetServer = commands.getResource(AssetServer);
-        const sceneGraph = new SceneGraph();
 
         const textureHandle = assetServer.load<ImageAsset>(
           "/sprites/character/sprites/RUN/run_down.png"
@@ -130,7 +120,6 @@ export class AnimatorDemoPlugin implements EcsPlugin {
           sprite.setPosition({ x: ball.x, y: 2 });
           sprite.setFrame(new Rect(0, 0, 0.125, 1));
 
-          sceneGraph.addRoot(sprite);
           const entity = commands.spawn(sprite, nearestFilter).id();
 
           // Bounce up and down - EXAGGERATED movement
@@ -163,7 +152,6 @@ export class AnimatorDemoPlugin implements EcsPlugin {
         pathSprite.setPosition({ x: -3, y: -2.5 });
         pathSprite.setFrame(new Rect(0, 0, 0.125, 1));
 
-        sceneGraph.addRoot(pathSprite);
         const timelineEntity = commands.spawn(pathSprite, nearestFilter).id();
 
         // Create a square path with scale changes
@@ -291,7 +279,6 @@ export class AnimatorDemoPlugin implements EcsPlugin {
         characterSprite.setPosition({ x: 0, y: -2 });
         characterSprite.setFrame(new Rect(0, 0, 0.125, 1));
 
-        sceneGraph.addRoot(characterSprite);
         const controllerEntity = commands
           .spawn(characterSprite, nearestFilter)
           .id();
@@ -389,7 +376,6 @@ export class AnimatorDemoPlugin implements EcsPlugin {
           sprite.setPosition({ x, y });
           sprite.setFrame(new Rect(0, 0, 0.125, 1));
 
-          sceneGraph.addRoot(sprite);
           const entity = commands.spawn(sprite, nearestFilter).id();
 
           // Each sprite orbits around the center
@@ -451,7 +437,6 @@ export class AnimatorDemoPlugin implements EcsPlugin {
         // Camera looks down -Z by default (rotation = 0,0,0), which is what we want
 
         commands.spawn(camera, new MainCamera());
-        commands.spawn(sceneGraph);
 
         console.log("\n✨ Watch the screen - animations are running!");
         console.log("Check console for animation events...\n");
@@ -529,7 +514,7 @@ export class AnimatorDemoPlugin implements EcsPlugin {
 
           const sceneGraphs = commands.query(SceneGraph).all();
           for (const [, sg] of sceneGraphs) {
-            sg.addRoot(particle);
+            sg.addChild(particle);
             break;
           }
 

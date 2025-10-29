@@ -1,27 +1,14 @@
 import {
   App,
-  DefaultPlugin,
   EcsPlugin,
   Transform,
-  Parent,
-  Children,
-  SceneGraph,
   Sprite,
-  Color,
-  OrthographicCamera,
-  MainCamera,
-  Input,
-  KeyCode,
-  TextureFilter,
   AssetServer,
   ImageAsset,
   Serializable,
   SerializeProperty,
   SceneSerializer,
-  type Handle,
 } from "@atlas/engine";
-
-import { TauriFileSystemAdapter } from "../../plugins/file-system";
 
 // Custom serializable component for the demo
 @Serializable()
@@ -70,23 +57,6 @@ class PlayerData {
   public levelUp(): void {
     this.level++;
     this.score += 100;
-  }
-}
-
-@Serializable()
-class SpriteData {
-  @SerializeProperty({ serializer: "handle", optional: true })
-  public texture: Handle<ImageAsset> | null;
-
-  @SerializeProperty()
-  public tint: Color;
-
-  constructor(
-    texture: Handle<ImageAsset> | null = null,
-    tint: Color = Color.white()
-  ) {
-    this.texture = texture;
-    this.tint = tint;
   }
 }
 
@@ -141,42 +111,35 @@ export class SerializationDemoPlugin implements EcsPlugin {
   build(app: App) {
     // Serializers are now auto-registered by App constructor
     // World now has saveScene/spawnScene methods built-in
-    app
-      .addPlugins(
-        new DefaultPlugin({
-          fileSystemAdapter: new TauriFileSystemAdapter(),
-          canvas: document.querySelector<HTMLCanvasElement>("canvas"),
-        })
-      )
-      .addStartupSystems(({ commands }) => {
-        const assetServer = app.getResource(AssetServer);
-        const texture = assetServer.load<ImageAsset>("/texutre-atlas.png");
-        const newScene = SceneSerializer.fromJSON(json);
-        const newPlayer = commands.spawnScene(newScene);
-        commands.spawnScene(newScene);
+    app.addStartupSystems(({ commands }) => {
+      const assetServer = app.getResource(AssetServer);
+      const texture = assetServer.load<ImageAsset>("/texutre-atlas.png");
+      const newScene = SceneSerializer.fromJSON(json);
+      const newPlayer = commands.spawnScene(newScene);
+      commands.spawnScene(newScene);
 
-        console.log(newScene);
-        console.log(newPlayer);
+      console.log(newScene);
+      console.log(newPlayer);
 
-        commands.debugWorld();
-        console.log(commands.find(PlayerData, Health, Transform));
+      commands.debugWorld();
+      console.log(commands.find(PlayerData, Health, Transform));
 
-        const newPlayer2 = commands.spawn(
-          new PlayerData("Player 2"),
-          new Health(100, 100),
-          new Transform({ x: 200, y: 200 }),
-          new RandomClass(),
-          new Sprite(texture, 1, 1)
-        );
+      const newPlayer2 = commands.spawn(
+        new PlayerData("Player 2"),
+        new Health(100, 100),
+        new Transform({ x: 200, y: 200 }),
+        new RandomClass(),
+        new Sprite(texture, 1, 1)
+      );
 
-        const savedScene = commands.saveScene([newPlayer2.id()]);
-        const savedSceneJson = SceneSerializer.toJSON(savedScene, true);
+      const savedScene = commands.saveScene([newPlayer2.id()]);
+      const savedSceneJson = SceneSerializer.toJSON(savedScene, true);
 
-        console.log(savedSceneJson);
+      console.log(savedSceneJson);
 
-        console.log(commands.find(PlayerData, Health, Transform));
+      console.log(commands.find(PlayerData, Health, Transform));
 
-        commands.debugWorld();
-      });
+      commands.debugWorld();
+    });
   }
 }

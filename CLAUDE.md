@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Common Commands
 
 ### Development
+
 ```bash
 pnpm dev              # Run dev server for web app (Vite with hot reload)
 pnpm build            # Build all packages (uses Turbo pipeline)
@@ -17,6 +18,7 @@ pnpm format           # Format code with Prettier
 ```
 
 ### Package-Specific
+
 ```bash
 cd apps/web && pnpm dev                    # Run web app only
 cd apps/web && pnpm build                  # Build web app (tsc + vite build)
@@ -24,6 +26,7 @@ cd packages/core && pnpm lint              # Lint specific package
 ```
 
 ### Tauri (Desktop App)
+
 ```bash
 pnpm tauri dev        # Run desktop app with Tauri
 pnpm tauri build      # Build desktop executable
@@ -66,12 +69,12 @@ Plugins extend engine functionality and manage their own lifecycle ([packages/co
 
 ```typescript
 interface EcsPlugin {
-  build(app: App): void | Promise<void>;      // Register systems/resources
+  build(app: App): void | Promise<void>; // Register systems/resources
   ready?(app: App): boolean | Promise<boolean>; // Check if dependencies ready
-  finish?(app: App): void | Promise<void>;    // Initialize after dependencies
-  cleanup?(app: App): void | Promise<void>;   // Cleanup on shutdown
-  name?(): string;                             // Plugin identifier
-  isUnique?(): boolean;                        // Allow multiple instances (default: true)
+  finish?(app: App): void | Promise<void>; // Initialize after dependencies
+  cleanup?(app: App): void | Promise<void>; // Cleanup on shutdown
+  name?(): string; // Plugin identifier
+  isUnique?(): boolean; // Allow multiple instances (default: true)
   dependsOn?(): (string | EcsPluginConstructor)[]; // Plugin dependencies
 }
 ```
@@ -81,6 +84,7 @@ interface EcsPlugin {
 ### Key Packages
 
 #### `@atlas/core` - ECS Foundation
+
 - World management and entity storage
 - System scheduler and execution
 - Plugin system with dependency resolution
@@ -93,11 +97,13 @@ interface EcsPlugin {
 - Scene management
 
 #### `@atlas/engine` - Unified API
+
 - Re-exports all subsystems from core, renderer, audio, animator, and UI
 - Main `App` class ([packages/core/src/index.ts:43-335](packages/core/src/index.ts#L43-L335)) orchestrates the engine
 - Default plugin groups for common configurations
 
 #### `@atlas/webgpu-renderer` - Graphics
+
 - WebGPU-based 2D rendering with batching
 - Components: `Sprite`, `AnimatedSprite`, `InstancedSprite`
 - `Container` for scene hierarchy and transforms
@@ -109,18 +115,21 @@ interface EcsPlugin {
 - **Compute Shader System** - Bevy-inspired framework for GPU compute (see Compute Shader System section below)
 
 #### `@atlas/animator` - Animation System
+
 - Property-based animation with easing functions
 - `Animation` component and resources
 - Property accessors for flexible targets (component properties, transforms, etc.)
 - System-driven updates (runs in Update phase)
 
 #### `@atlas/audio` - Sound Management
+
 - Uses native Web Audio API (AudioContext, AudioBufferSourceNode, GainNode, PannerNode)
 - Audio bus system for mixing (master, sfx, music buses)
 - Spatial audio support with 3D positioning
 - Asset-based audio loading
 
 #### `@atlas/ui` - User Interface
+
 - Modern, ECS-first UI system rendering to HTML/DOM
 - Three-phase update cycle: DOM sync → Layout → Interaction
 - **Components**: Core (`UiNode`, `UiElement`, `UiRoot`, `UiClass`, `UiStyle`), Layout (`FlexLayout`, `GridLayout`, `Spacing`, `Size`, `Position`, `FlexItem`, `GridItem`), Appearance (`Background`, `Border`, `Shadow`, `Overflow`, `Opacity`, `Cursor`), Text (`Text`, `TextStyle`, `TextColor`, `TextAlign`), Interactive (`OnClick`, `OnHoverEnter`, `OnHoverExit`, `OnFocus`, `OnBlur`, `Disabled`)
@@ -132,6 +141,7 @@ interface EcsPlugin {
 - See [packages/ui/README.md](packages/ui/README.md) for complete documentation
 
 #### `@atlas/tiled` - Tiled Map Editor Integration
+
 - Complete ECS integration for Tiled Map Editor (.tmj, .tsj files)
 - Asset loaders for Tiled maps and tilesets
 - Automatic conversion to renderer TileMap/TileSet
@@ -147,9 +157,7 @@ interface EcsPlugin {
 All apps follow this pattern (see [apps/web/src/main.ts:18-35](apps/web/src/main.ts#L18-L35)):
 
 ```typescript
-await App.create()
-  .addPlugins(new MyGamePlugin(), new DebugPlugin())
-  .run();
+await App.create().addPlugins(new MyGamePlugin(), new DebugPlugin()).run();
 ```
 
 **Important**: Plugins are added as **instances**, not classes. The `App.create()` factory automatically registers `EntityAddedEvent` and built-in serializers.
@@ -184,6 +192,7 @@ export const movePlayerSystem = sys(({ commands }) => {
 ```
 
 **System Patterns:**
+
 - Systems receive `{ commands, events }` via destructuring
 - Use `commands.getResource(ResourceClass)` to access global resources
 - Use `commands.query(QueryBuilder)` to find entities with components
@@ -196,6 +205,7 @@ export const movePlayerSystem = sys(({ commands }) => {
 ### Resources and Dependency Injection
 
 Resources are global singleton objects stored in the App:
+
 - Access via `commands.getResource(MyResource)`
 - Register with `app.setResource(new MyResource())`
 - Check existence with `app.hasResource(MyResource)`
@@ -204,6 +214,7 @@ Resources are global singleton objects stored in the App:
 ### Events
 
 Event system provides decoupled communication:
+
 - Register events: `app.addEvent(MyEvent)`
 - Write events in systems: `events.send(new MyEvent(data))`
 - Read events in systems: `events.read(MyEvent).forEach(event => {...})`
@@ -214,6 +225,7 @@ Event system provides decoupled communication:
 The Observer System provides reactive, event-driven programming for the ECS (inspired by Bevy). Observers are callbacks that automatically fire when events are triggered.
 
 **Key Features:**
+
 - Component lifecycle observers (`ComponentAdded`, `ComponentRemoved`)
 - Custom event observers (any event type)
 - Entity-scoped observers (only fire for specific entities)
@@ -225,58 +237,66 @@ The Observer System provides reactive, event-driven programming for the ECS (ins
 ```typescript
 // Register global observer
 app.addObserver(EventClass, (trigger, commands) => {
-  const event = trigger.event();      // Get event instance
-  const entity = trigger.entity();    // Get target entity (0 for broadcast)
+  const event = trigger.event(); // Get event instance
+  const entity = trigger.entity(); // Get target entity (0 for broadcast)
   // React to event
 });
 
 // Trigger events from systems
-commands.trigger(new MyEvent());              // Broadcast
-commands.trigger(new MyEvent(), entity);      // Entity-targeted
+commands.trigger(new MyEvent()); // Broadcast
+commands.trigger(new MyEvent(), entity); // Entity-targeted
 
 // Entity-scoped observers (only fire for this entity)
-commands.spawn(new Mine())
-  .observe(Explode, (trigger, commands) => {
-    // Only fires when THIS entity receives Explode event
-  });
+commands.spawn(new Mine()).observe(Explode, (trigger, commands) => {
+  // Only fires when THIS entity receives Explode event
+});
 ```
 
 **Component Lifecycle Observers:**
 
 ```typescript
 // React when Mine component is added to any entity
-app.addObserver(ComponentAdded, (trigger: Trigger<ComponentAdded<Mine>>, commands) => {
-  const event = trigger.event();
-  if (!(event.component instanceof Mine)) return;
+app.addObserver(
+  ComponentAdded,
+  (trigger: Trigger<ComponentAdded<Mine>>, commands) => {
+    const event = trigger.event();
+    if (!(event.component instanceof Mine)) return;
 
-  const mine = event.component;
-  const index = commands.getResource(SpatialIndex);
-  index.add(event.entity, mine.pos);
-});
+    const mine = event.component;
+    const index = commands.getResource(SpatialIndex);
+    index.add(event.entity, mine.pos);
+  }
+);
 
 // React when Mine component is removed
-app.addObserver(ComponentRemoved, (trigger: Trigger<ComponentRemoved<Mine>>, commands) => {
-  const event = trigger.event();
-  if (!(event.component instanceof Mine)) return;
+app.addObserver(
+  ComponentRemoved,
+  (trigger: Trigger<ComponentRemoved<Mine>>, commands) => {
+    const event = trigger.event();
+    if (!(event.component instanceof Mine)) return;
 
-  const mine = event.component;
-  const index = commands.getResource(SpatialIndex);
-  index.remove(event.entity, mine.pos);
-});
+    const mine = event.component;
+    const index = commands.getResource(SpatialIndex);
+    index.remove(event.entity, mine.pos);
+  }
+);
 ```
 
 **Observer Execution Timing:**
 
 Observers flush at these boundaries:
+
 1. After `PostUpdate` phase
 2. After each `PostFixedUpdate` cycle
 
 Execution order:
+
 ```
 Update → PostUpdate → [Flush Observers] → [Flush Despawns] → Fixed Update Loop
 ```
 
 **Comparison with Events:**
+
 - **Events**: Polled by systems using readers (pull model)
 - **Observers**: Execute automatically when triggered (push model)
 
@@ -286,7 +306,12 @@ Use observers for reactive logic that responds to specific events, use events fo
 
 ```typescript
 class Explode {}
-class ExplodeMines { constructor(public pos: vec2, public radius: number) {} }
+class ExplodeMines {
+  constructor(
+    public pos: vec2,
+    public radius: number
+  ) {}
+}
 
 await App.create()
   // Component added observer (spatial index)
@@ -321,47 +346,49 @@ await App.create()
 ### Entity Spawning
 
 **Spawning with components directly:**
+
 ```typescript
 // Spawn with 1-4 components (method is overloaded)
-const entity = commands.spawn(
-  new Position(100, 100),
-  new Sprite(textureHandle)
-).id();
+const entity = commands
+  .spawn(new Position(100, 100), new Sprite(textureHandle))
+  .id();
 
 // Can chain methods for relationships
-commands.spawn(new ChildComponent())
-  .withParent(parentEntity)
-  .id();
+commands.spawn(new ChildComponent()).withParent(parentEntity).id();
 ```
 
 **Spawning with bundles:**
+
 ```typescript
 // Define a bundle
 const PlayerBundle = defineBundle({
   position: Position,
   sprite: Sprite,
-  velocity: Velocity
+  velocity: Velocity,
 });
 
 // Spawn bundle with component constructor arguments as arrays
-commands.spawnBundle(PlayerBundle, {
-  position: [100, 100],           // new Position(100, 100)
-  sprite: [textureHandle],        // new Sprite(textureHandle)
-  velocity: []                    // new Velocity() - optional if no required args
-}).id();
+commands
+  .spawnBundle(PlayerBundle, {
+    position: [100, 100], // new Position(100, 100)
+    sprite: [textureHandle], // new Sprite(textureHandle)
+    velocity: [], // new Velocity() - optional if no required args
+  })
+  .id();
 
 // For required components, use defineBundle.required()
 const RequiredBundle = defineBundle({
-  position: defineBundle.required(Position),  // Must be provided
-  sprite: Sprite                               // Optional
+  position: defineBundle.required(Position), // Must be provided
+  sprite: Sprite, // Optional
 });
 
 commands.spawnBundle(RequiredBundle, {
-  position: [100, 100]  // Must provide array of constructor args
+  position: [100, 100], // Must provide array of constructor args
 });
 ```
 
 **Key points:**
+
 - `commands.spawn()` takes component **instances** (1-4 components)
 - `commands.spawnBundle()` takes a bundle and **overrides object**
 - Bundle overrides use **arrays** as constructor arguments: `{ position: [x, y] }`
@@ -393,7 +420,7 @@ commands.entity(entity).despawnRecursive();
 // Safe to despawn during iteration
 commands.query(Health).forEach((entity, health) => {
   if (health.value <= 0) {
-    commands.despawnEntity(entity);  // Queued, not immediate
+    commands.despawnEntity(entity); // Queued, not immediate
   }
   // Entity still exists here
 });
@@ -402,6 +429,7 @@ commands.query(Health).forEach((entity, health) => {
 ```
 
 **Flush Timing** (automatic):
+
 1. After `PostUpdate` phase
 2. After each `PostFixedUpdate` cycle
 3. Before `Render` phase
@@ -499,6 +527,7 @@ commands.despawnEntityRecursive(parent);
 #### Common Patterns
 
 **Pattern 1: Cleanup on death**
+
 ```typescript
 sys(({ commands }) => {
   commands.query(Health).forEach((entity, health) => {
@@ -510,6 +539,7 @@ sys(({ commands }) => {
 ```
 
 **Pattern 2: Timed despawn**
+
 ```typescript
 class Lifetime {
   constructor(public duration: number) {}
@@ -528,6 +558,7 @@ sys(({ commands }) => {
 ```
 
 **Pattern 3: Cleanup with event listener**
+
 ```typescript
 class PhysicsBody {
   constructor(public handle: RigidBodyHandle) {}
@@ -547,6 +578,7 @@ sys(({ commands, events }) => {
 ```
 
 **Pattern 4: Recursive hierarchy despawn**
+
 ```typescript
 // Despawn UI menu and all child elements
 commands.entity(menuRoot).despawnRecursive();
@@ -566,14 +598,16 @@ commands.entity(particleSystem).despawnRecursive();
 #### Anti-Patterns
 
 **❌ Don't: Try to access despawned entities**
+
 ```typescript
 // BAD
 commands.despawnEntity(enemy);
-const position = commands.getComponent(enemy, Position);  // Still queued, works now
+const position = commands.getComponent(enemy, Position); // Still queued, works now
 // After flush: entity is gone, would throw error
 ```
 
 **✅ Do: Check existence before access**
+
 ```typescript
 // GOOD
 const position = commands.tryGetComponent(enemy, Position);
@@ -583,15 +617,17 @@ if (position) {
 ```
 
 **❌ Don't: Manually update Parent/Children on despawn**
+
 ```typescript
 // BAD - Unnecessary and error-prone
 const parent = commands.getComponent(child, Parent);
 const children = commands.getComponent(parent.parentId, Children);
-children.childrenIds = children.childrenIds.filter(id => id !== child);
+children.childrenIds = children.childrenIds.filter((id) => id !== child);
 commands.despawnEntity(child);
 ```
 
 **✅ Do: Use recursive despawn or accept invalid references**
+
 ```typescript
 // GOOD - Recursive despawn handles hierarchy
 commands.despawnEntityRecursive(parent);
@@ -604,6 +640,7 @@ commands.despawnEntity(child);
 ### Serialization System
 
 The new serialization system (see `packages/core/src/ecs/serialization`) enables:
+
 - Component serialization/deserialization
 - Entity snapshot and restore
 - Scene persistence
@@ -623,12 +660,14 @@ The new serialization system (see `packages/core/src/ecs/serialization`) enables
 ## Development Notes
 
 ### TypeScript Configuration
+
 - All packages use `@repo/typescript-config` for consistency
 - Exports are source-level (`"./src/index.ts"`) to enable faster iteration
 - Decorator support enabled (`experimentalDecorators`, `emitDecoratorMetadata`)
 - Reflect metadata required for decorators
 
 ### WebGPU Requirements
+
 - Vite config uses `vite-plugin-wasm` and `vite-plugin-top-level-await`
 - Rapier2D requires WASM support
 - Target modern browsers with WebGPU support (Chrome 113+, Edge 113+)
@@ -636,6 +675,7 @@ The new serialization system (see `packages/core/src/ecs/serialization`) enables
 ### Demo Games Location
 
 Example games in `apps/web/src/games/`:
+
 - `boid` - Flocking simulation (compute shaders)
 - `game-of-life` - Cellular automata (WebGPU compute)
 - `animator-demo` - Animation showcase
@@ -649,6 +689,7 @@ Change the `GAME` constant in [apps/web/src/main.ts:16](apps/web/src/main.ts#L16
 ### Build Pipeline
 
 Turbo handles build orchestration ([turbo.json](turbo.json)):
+
 - Build task depends on dependencies building first (`^build`)
 - Outputs cached in `dist/**`
 - Dev tasks never cached (`"cache": false, "persistent": true`)
@@ -664,9 +705,7 @@ export class MyPlugin implements EcsPlugin {
     app.setResource(new MyResource());
 
     // Register systems with createSet() for grouping
-    app.addStartupSystems(
-      createSet("MyPlugin::Init", initSystem)
-    );
+    app.addStartupSystems(createSet("MyPlugin::Init", initSystem));
 
     app.addUpdateSystems(
       createSet("MyPlugin::Update", updateSystem1, updateSystem2)
@@ -683,9 +722,7 @@ export class MyPlugin implements EcsPlugin {
 }
 
 // Usage: Add plugin instance, not class
-await App.create()
-  .addPlugins(new MyPlugin())
-  .run();
+await App.create().addPlugins(new MyPlugin()).run();
 ```
 
 ## Compute Shader System
@@ -747,9 +784,9 @@ class MyComputeWorker extends ComputeWorker {
     const initialData = new Float32Array([1, 2, 3, 4]);
 
     return new ComputeWorkerBuilder(device)
-      .addUniform("config", 2.0)              // Small read-only data
-      .addStorage("data", initialData)        // Large GPU-only arrays
-      .addStaging("output", initialData)      // Bidirectional with CPU readback
+      .addUniform("config", 2.0) // Small read-only data
+      .addStorage("data", initialData) // Large GPU-only arrays
+      .addStaging("output", initialData) // Bidirectional with CPU readback
       .addPass(MyComputeShader, [64, 1, 1], ["config", "data", "output"])
       .build();
   }
@@ -760,15 +797,16 @@ class MyComputeWorker extends ComputeWorker {
 
 Three buffer types handle different use cases:
 
-| Buffer Type | CPU→GPU | GPU→CPU | Use Case | Method |
-|-------------|---------|---------|----------|---------|
-| **Uniform** | ✓ | ✗ | Small config data (<64KB), constants | `.addUniform()` |
-| **Storage** | ✓ | ✗ | Large GPU-only arrays | `.addStorage()` |
-| **Staging** | ✓ | ✓ | Bidirectional with CPU readback | `.addStaging()` |
+| Buffer Type | CPU→GPU | GPU→CPU | Use Case                             | Method          |
+| ----------- | ------- | ------- | ------------------------------------ | --------------- |
+| **Uniform** | ✓       | ✗       | Small config data (<64KB), constants | `.addUniform()` |
+| **Storage** | ✓       | ✗       | Large GPU-only arrays                | `.addStorage()` |
+| **Staging** | ✓       | ✓       | Bidirectional with CPU readback      | `.addStaging()` |
 
 ### Using Compute Workers in ECS
 
 **Pattern 1: Component-based state**
+
 ```typescript
 class MySimulation {
   constructor(
@@ -790,32 +828,37 @@ sys(({ commands }) => {
   const [, simulation] = commands.query(MySimulation).find();
 
   // Execute compute shader (async, non-blocking)
-  simulation.worker.execute().then(() => {
-    // Read results from GPU
-    return simulation.worker.readTypedArray("output", Float32Array);
-  }).then((result) => {
-    // Update simulation state
-    simulation.data = result;
+  simulation.worker
+    .execute()
+    .then(() => {
+      // Read results from GPU
+      return simulation.worker.readTypedArray("output", Float32Array);
+    })
+    .then((result) => {
+      // Update simulation state
+      simulation.data = result;
 
-    // Ping-pong pattern: output becomes next input
-    simulation.worker.write("data", result);
-  });
+      // Ping-pong pattern: output becomes next input
+      simulation.worker.write("data", result);
+    });
 });
 ```
 
 ### Data Transfer API
 
 **Writing to GPU:**
+
 ```typescript
-worker.write("config", 3.14);                    // Update uniform
-worker.write("data", new Float32Array([1,2,3])); // Update storage/staging
-worker.writeSlice("data", values, offset);       // Partial update
+worker.write("config", 3.14); // Update uniform
+worker.write("data", new Float32Array([1, 2, 3])); // Update storage/staging
+worker.writeSlice("data", values, offset); // Partial update
 ```
 
 **Reading from GPU (staging buffers only):**
+
 ```typescript
-const buffer = await worker.read("output");                    // ArrayBuffer
-const values = await worker.readVec("output");                 // number[] (Float32Array)
+const buffer = await worker.read("output"); // ArrayBuffer
+const values = await worker.readVec("output"); // number[] (Float32Array)
 const uint32 = await worker.readTypedArray("output", Uint32Array); // Typed array
 ```
 
@@ -846,9 +889,9 @@ builder
   .build();
 
 // Each iteration:
-await worker.execute();                        // Read src, write dst
+await worker.execute(); // Read src, write dst
 const output = await worker.readTypedArray("stateDst", Float32Array);
-worker.write("stateSrc", output);              // Swap: dst → src
+worker.write("stateSrc", output); // Swap: dst → src
 ```
 
 ### Example: Boid Flocking Simulation
@@ -926,22 +969,25 @@ fn main(@builtin(global_invocation_id) grid: vec3<u32>) {
 ### Key Patterns
 
 **One-shot execution** (manual control):
+
 ```typescript
-builder.oneShot().build();  // Prevent automatic execution
-await worker.execute();      // Explicit execution on demand
+builder.oneShot().build(); // Prevent automatic execution
+await worker.execute(); // Explicit execution on demand
 ```
 
 **Resource introspection**:
+
 ```typescript
-worker.hasBuffer("name")           // Check if buffer exists
-worker.getBufferSize("name")       // Get size in bytes
-worker.getBufferNames()            // List all buffers
-worker.isOneShotWorker()           // Check execution mode
+worker.hasBuffer("name"); // Check if buffer exists
+worker.getBufferSize("name"); // Get size in bytes
+worker.getBufferNames(); // List all buffers
+worker.isOneShotWorker(); // Check execution mode
 ```
 
 **Error handling**:
+
 ```typescript
-shader.checkCompilation(device);   // Validate shader compilation
+shader.checkCompilation(device); // Validate shader compilation
 // Throws error with WGSL line numbers if compilation fails
 ```
 
@@ -987,6 +1033,7 @@ The system creates a global `#atlas-ui-root` wrapper div mounted to `document.bo
 ### Component Categories
 
 **Core Components:**
+
 - `UiNode` - Marks entity as UI element, holds DOM element reference
 - `UiElement` - Specifies HTML tag ('div', 'button', 'span', etc.)
 - `UiRoot` - Marks element as root container (mounted to global wrapper)
@@ -994,6 +1041,7 @@ The system creates a global `#atlas-ui-root` wrapper div mounted to `document.bo
 - `UiStyle` - Inline styles as key-value map
 
 **Layout Components:**
+
 - `FlexLayout` - Complete flexbox layout (direction, wrap, justify-content, align-items, gap)
 - `FlexItem` - Flex child properties (flex-grow, flex-shrink, flex-basis, align-self, order)
 - `GridLayout` - CSS Grid layout (template-columns/rows, gap, justify/align-items/content, auto-flow)
@@ -1003,6 +1051,7 @@ The system creates a global `#atlas-ui-root` wrapper div mounted to `document.bo
 - `Position` - Positioning (absolute, relative, fixed) with offsets and z-index
 
 **Appearance Components:**
+
 - `Background` - Background color, image, size, position, repeat
 - `Border` - Width, style, color (all-side and per-side), border radius
 - `Shadow` - Box shadow and text shadow
@@ -1011,12 +1060,14 @@ The system creates a global `#atlas-ui-root` wrapper div mounted to `document.bo
 - `Cursor` - Cursor style (pointer, text, grab, etc.)
 
 **Text Components:**
+
 - `Text` - Text content string (updates DOM `textContent`)
 - `TextStyle` - Font size, weight, family, line-height, letter-spacing, etc.
 - `TextColor` - Text color (defaults to black)
 - `TextAlign` - Text alignment (horizontal and vertical)
 
 **Interactive Components:**
+
 - `Interactive` - Marks entity as listening to DOM events
 - `OnClick<T>` - Fires custom event on click
 - `OnHoverEnter<T>` / `OnHoverExit<T>` - Fires events on mouse enter/exit
@@ -1030,56 +1081,63 @@ The system creates a global `#atlas-ui-root` wrapper div mounted to `document.bo
 Pre-configured component collections for common UI patterns:
 
 **BoxBundle** - Flexible container with layout capabilities
+
 ```typescript
 commands.spawnBundle(BoxBundle, {
-  flexLayout: [{ direction: 'column', gap: 20 }],
+  flexLayout: [{ direction: "column", gap: 20 }],
   spacing: [{ padding: { all: 24 } }],
-  size: [{ width: '100%', height: 'auto' }],
-  background: [{ color: '#f0f0f0' }],
-  border: [{ radius: 8 }]
+  size: [{ width: "100%", height: "auto" }],
+  background: [{ color: "#f0f0f0" }],
+  border: [{ radius: 8 }],
 });
 ```
 
 **ButtonBundle** - Interactive button component
+
 ```typescript
 commands.spawnBundle(ButtonBundle, {
-  text: ['Click Me'],  // Required
-  background: [{ color: '#4CAF50' }],
+  text: ["Click Me"], // Required
+  background: [{ color: "#4CAF50" }],
   spacing: [{ padding: { vertical: 12, horizontal: 24 } }],
   border: [{ radius: 4 }],
-  cursor: ['pointer']
+  cursor: ["pointer"],
 });
 ```
 
 **TextBundle** - Styled text element
+
 ```typescript
 commands.spawnBundle(TextBundle, {
-  text: ['Hello, World!'],  // Required
-  textStyle: [{ fontSize: 24, fontWeight: 'bold' }],
-  textColor: [{ color: '#333333' }]
+  text: ["Hello, World!"], // Required
+  textStyle: [{ fontSize: 24, fontWeight: "bold" }],
+  textColor: [{ color: "#333333" }],
 });
 ```
 
 **FlexBundle** - Flexbox container
+
 ```typescript
 commands.spawnBundle(FlexBundle, {
-  flexLayout: [{ direction: 'row', gap: 16, justifyContent: 'space-between' }],
+  flexLayout: [{ direction: "row", gap: 16, justifyContent: "space-between" }],
   spacing: [{ padding: { all: 20 } }],
-  size: [{ width: '100%' }],
-  background: [{ color: '#f0f0f0' }]
+  size: [{ width: "100%" }],
+  background: [{ color: "#f0f0f0" }],
 });
 ```
 
 **GridBundle** - CSS Grid container for 2D layouts
+
 ```typescript
 commands.spawnBundle(GridBundle, {
-  gridLayout: [{
-    templateColumns: 'repeat(3, 1fr)',
-    gap: 16,
-    alignItems: 'center'
-  }],
+  gridLayout: [
+    {
+      templateColumns: "repeat(3, 1fr)",
+      gap: 16,
+      alignItems: "center",
+    },
+  ],
   spacing: [{ padding: { all: 20 } }],
-  size: [{ width: '100%' }]
+  size: [{ width: "100%" }],
 });
 ```
 
@@ -1088,25 +1146,29 @@ commands.spawnBundle(GridBundle, {
 #### Creating UI Elements
 
 **Using bundles (recommended):**
+
 ```typescript
-const button = commands.spawnBundle(ButtonBundle, {
-  text: ['Submit'],
-  background: [{ color: '#2196F3' }]
-})
-.insert(new UiRoot())
-.id();
+const button = commands
+  .spawnBundle(ButtonBundle, {
+    text: ["Submit"],
+    background: [{ color: "#2196F3" }],
+  })
+  .insert(new UiRoot())
+  .id();
 ```
 
 **Using individual components:**
+
 ```typescript
-const button = commands.spawn(
-  new UiNode(),
-  new UiElement('button'),
-  new Text('Submit'),
-  new Background({ color: '#2196F3' })
-)
-.insert(new UiRoot())
-.id();
+const button = commands
+  .spawn(
+    new UiNode(),
+    new UiElement("button"),
+    new Text("Submit"),
+    new Background({ color: "#2196F3" })
+  )
+  .insert(new UiRoot())
+  .id();
 ```
 
 #### Building Hierarchies
@@ -1115,23 +1177,23 @@ Use ECS parent-child relationships:
 
 ```typescript
 // Create container
-const container = commands.spawnBundle(BoxBundle, {
-  flexLayout: [{ direction: 'column', gap: 16 }]
-})
-.insert(new UiRoot())
-.id();
+const container = commands
+  .spawnBundle(BoxBundle, {
+    flexLayout: [{ direction: "column", gap: 16 }],
+  })
+  .insert(new UiRoot())
+  .id();
 
 // Add children
-commands.spawn(new UiNode(), new Text('Title'))
-  .withParent(container);
+commands.spawn(new UiNode(), new Text("Title")).withParent(container);
 
-commands.spawn(new UiNode(), new Text('Subtitle'))
-  .withParent(container);
+commands.spawn(new UiNode(), new Text("Subtitle")).withParent(container);
 ```
 
 #### Event-Driven Interaction
 
 **1. Define custom event classes:**
+
 ```typescript
 class ButtonClickEvent {
   constructor(
@@ -1142,22 +1204,26 @@ class ButtonClickEvent {
 ```
 
 **2. Register events with app:**
+
 ```typescript
 app.addEvent(ButtonClickEvent);
 ```
 
 **3. Add event components to entities:**
+
 ```typescript
-commands.spawn(new UiNode())
-  .insert(new OnClick(ButtonClickEvent, 'submit-btn'));
+commands
+  .spawn(new UiNode())
+  .insert(new OnClick(ButtonClickEvent, "submit-btn"));
 ```
 
 **4. Handle events in systems:**
+
 ```typescript
 sys(({ events }) => {
   const reader = events.reader(ButtonClickEvent);
   for (const event of reader.read()) {
-    console.log('Button clicked:', event.buttonId);
+    console.log("Button clicked:", event.buttonId);
   }
 });
 ```
@@ -1171,13 +1237,13 @@ sys(({ commands }) => {
   // Update hovered buttons
   for (const [entity, button, hovered] of commands.all(Button, Hovered)) {
     const background = commands.getComponent(entity, Background);
-    background.color = '#45a049';  // Hover color
+    background.color = "#45a049"; // Hover color
   }
 
   // Reset non-hovered buttons
   for (const [entity, button] of commands.all(Button).without(Hovered)) {
     const background = commands.getComponent(entity, Background);
-    background.color = '#4CAF50';  // Normal color
+    background.color = "#4CAF50"; // Normal color
   }
 });
 ```
@@ -1217,26 +1283,28 @@ await App.create()
   .addEvent(ButtonClickEvent)
   .addStartupSystems(({ commands }) => {
     // Create menu container
-    const menu = commands.spawnBundle(BoxBundle, {
-      flexLayout: [{ direction: 'column', gap: 20 }],
-      size: [{ width: '400px', height: '100vh' }],
-      background: [{ color: 'rgba(20, 20, 30, 0.95)' }]
-    })
-    .insert(new UiRoot())
-    .id();
+    const menu = commands
+      .spawnBundle(BoxBundle, {
+        flexLayout: [{ direction: "column", gap: 20 }],
+        size: [{ width: "400px", height: "100vh" }],
+        background: [{ color: "rgba(20, 20, 30, 0.95)" }],
+      })
+      .insert(new UiRoot())
+      .id();
 
     // Add button
-    commands.spawnBundle(ButtonBundle, {
-      text: ['START GAME'],
-      background: [{ color: '#4CAF50' }]
-    })
-    .insert(new OnClick(ButtonClickEvent))
-    .withParent(menu);
+    commands
+      .spawnBundle(ButtonBundle, {
+        text: ["START GAME"],
+        background: [{ color: "#4CAF50" }],
+      })
+      .insert(new OnClick(ButtonClickEvent))
+      .withParent(menu);
   })
   .addUpdateSystems(({ events }) => {
     const reader = events.reader(ButtonClickEvent);
     for (const event of reader.read()) {
-      console.log('Start game clicked!');
+      console.log("Start game clicked!");
     }
   })
   .run();
@@ -1314,9 +1382,7 @@ import { TiledEcsPlugin, TiledTileMap } from "@atlas/tiled";
 import { AssetServer, SceneGraph } from "@atlas/engine";
 
 // 1. Add plugin to app
-await App.create()
-  .addPlugins(new TiledEcsPlugin())
-  .run();
+await App.create().addPlugins(new TiledEcsPlugin()).run();
 
 // 2. In a system, load and spawn the map
 sys(({ commands }) => {
@@ -1331,7 +1397,7 @@ sys(({ commands }) => {
   tiledMap.setPosition({ x: 0, y: 0, z: 0 });
 
   // Add to scene graph for rendering
-  sceneGraph.addRoot(tiledMap);
+  sceneGraph.addChild(tiledMap);
 
   // Spawn into ECS world
   commands.spawn(tiledMap);
@@ -1341,6 +1407,7 @@ sys(({ commands }) => {
 ### How It Works Internally
 
 **Initial Load (First Frame):**
+
 1. System checks if `TiledTileMap.loaded === false`
 2. Waits for map asset JSON to load via AssetServer
 3. Loads external tilesets (`.tsj` files) if referenced
@@ -1352,6 +1419,7 @@ sys(({ commands }) => {
 9. Marks `TiledTileMap.loaded = true`
 
 **Subsequent Frames (After Load):**
+
 1. System syncs pending tile grids: `tileSet.syncPendingTileGrids()`
 2. System syncs pending tiles: `layer.syncPendingTiles()`
 3. `tileSetLoadingSystem` (from webgpu-renderer) converts `Handle<ImageAsset>` → `Texture`
@@ -1360,11 +1428,13 @@ sys(({ commands }) => {
 ### Important Implementation Details
 
 **Coordinate System Conversion:**
+
 - Tiled uses Y-down (origin top-left, row 0 is top)
 - Renderer uses Y-up (origin bottom-left, row 0 is bottom)
 - Solution: `const rendererY = height - 1 - y` when placing tiles
 
 **Texture Filtering:**
+
 - Default renderer uses `flipY: true, minFilter: "linear", magFilter: "linear"`
 - Tiled tilesets need `flipY: false` (Y-down coordinate system)
 - Linear filtering causes bleeding artifacts between tiles
@@ -1377,6 +1447,7 @@ sys(({ commands }) => {
   ```
 
 **Layer Ordering:**
+
 - Tiled renders layers in array order: `layers[0]` on bottom, `layers[n-1]` on top
 - Actually, Tiled's UI shows `layers[0]` at top of list and renders it on top
 - Solution: Reverse z-index calculation:
@@ -1385,11 +1456,13 @@ sys(({ commands }) => {
   ```
 
 **GID to Local ID Conversion:**
+
 - Tiled uses Global IDs (GIDs) with flip flags in top 3 bits
 - Must decode: `localId = (gid & FLIP_FLAGS_MASK) - firstgid`
 - Special case: GID 0 is always empty tile
 
 **Deferred Loading Pattern:**
+
 - Don't wait for `assetServer.getLoadState(imageHandle) === LoadState.Loaded`
 - Let `TileSet.addTilesFromGrid()` defer if texture not ready
 - Let `syncPendingTileGrids()` and `syncPendingTiles()` handle progressive loading
@@ -1423,23 +1496,28 @@ packages/tiled/src/
 ### Common Issues and Solutions
 
 **Issue: Tiles not rendering**
+
 - Check that `TileMap` is spawned into ECS world (`commands.spawn(tileMap)`)
 - The `tileSetLoadingSystem` queries for `TileMap` components to load textures
 - Solution: System now automatically spawns `TileMap` in Step 7 of loading
 
 **Issue: Line artifacts between tiles**
+
 - Caused by linear texture filtering sampling between adjacent tiles
 - Solution: Use nearest-neighbor filtering (automatically applied)
 
 **Issue: Map renders upside down**
+
 - Tiled uses Y-down, renderer uses Y-up
 - Solution: Y-coordinate conversion during tile placement (automatically handled)
 
 **Issue: Wrong tiles appear**
+
 - Texture might be flipped vertically due to `flipY: true`
 - Solution: Set `flipY: false` for Tiled tilesets (automatically applied)
 
 **Issue: Layers in wrong order**
+
 - Z-index calculation might not match Tiled's rendering order
 - Solution: Reverse z-index calculation (automatically handled)
 
